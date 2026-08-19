@@ -3,7 +3,7 @@ import requests
 import os
 import json
 
-app = Flask(name)
+app = Flask(__name__)
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
@@ -134,6 +134,6 @@ def webhook():
     return "OK", 200
 
 
-if name == "main":
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
