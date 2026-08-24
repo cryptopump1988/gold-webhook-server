@@ -136,7 +136,7 @@ def build_chart_url(closes, entry, sl, tp1, tp2, tp3, signal):
 
 
 def build_caption(symbol, signal, kind, entry, sl, tp1, tp2, tp3):
-    dot = "\ud83d\udfe2" if signal == "BUY" else "\ud83d\udd34"
+    dot = "🟢" if signal == "BUY" else "🔴"
     title = (signal + " SETUP") if kind == "signal" else (signal + " ZONE TOUCHED AGAIN")
     caption = dot + " <b>" + symbol + " / GOLD</b>\n\n<b>" + title + "</b>\n\nEntry: " + entry + "\nSL: " + sl + "\n\nTP1: " + tp1 + "\nTP2: " + tp2 + "\nTP3: " + tp3
     return caption
@@ -269,6 +269,39 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
   padding:9px 14px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;
   box-shadow: 0 3px 10px rgba(46,160,67,0.3); transition: transform 0.15s;
 }
+.switch-btn {
+  background:var(--card2); border:1px solid var(--border); border-radius:10px; width:38px; height:38px;
+  font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.chooser-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100;
+  align-items:center; justify-content:center; padding:20px;
+}
+.chooser-overlay.show { display:flex; }
+.chooser-box {
+  background:var(--card); border:1px solid var(--border); border-radius:18px; padding:24px;
+  max-width:400px; width:100%; box-shadow: var(--shadow);
+}
+.chooser-box h2 { margin:0 0 6px; font-size:19px; }
+.chooser-box p { margin:0 0 18px; color:var(--muted); font-size:13px; }
+.chooser-option {
+  display:flex; gap:14px; align-items:center; padding:14px; border-radius:14px; background:var(--card2);
+  border:1px solid var(--border); margin-bottom:10px; cursor:pointer; transition: transform 0.15s, border-color 0.2s;
+}
+.chooser-option:active { transform: scale(0.97); }
+.chooser-option:hover { border-color: var(--accent); }
+.chooser-icon { font-size:26px; }
+.chooser-title { font-weight:700; font-size:14px; margin-bottom:3px; }
+.chooser-desc { font-size:12px; color:var(--muted); line-height:1.4; }
+.setups-hint { font-size:11px; color:var(--muted); text-align:center; padding:8px 16px 12px; }
+.setups-tooltip {
+  position:absolute; background:var(--card2); border:1px solid var(--accent); border-radius:10px;
+  padding:10px 12px; font-size:12px; box-shadow: var(--shadow); z-index:5; pointer-events:none;
+  min-width:150px;
+}
+.setups-tooltip .t-row { display:flex; justify-content:space-between; gap:10px; padding:2px 0; }
+.setups-tooltip .t-label { color:var(--muted); }
+.setups-tooltip .t-title { font-weight:700; margin-bottom:4px; }
 .refresh-btn:active { transform: scale(0.94); }
 .refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
 @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
@@ -349,7 +382,8 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
     </div>
   </div>
   <div class="header-actions">
-    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()"><div class="knob" id="themeKnob">\ud83c\udf19</div></div>
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()"><div class="knob" id="themeKnob">🌙</div></div>
+    <button class="switch-btn" id="switchBtn" onclick="openChooser()">📊</button>
     <button class="refresh-btn" id="refreshBtn" onclick="load(true)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0114.6-3.4L21 8M20.5 15a9 9 0 01-14.6 3.4L3 16"/></svg>
       Refresh
@@ -357,27 +391,57 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
   </div>
 </div>
 
-<div class="chart-embed-card">
+<div class="chooser-overlay" id="chooserOverlay">
+  <div class="chooser-box">
+    <h2>Choose Your Chart</h2>
+    <p>Pick which chart view you'd like to see</p>
+    <div class="chooser-option" onclick="selectChart('tv')">
+      <div class="chooser-icon">📊</div>
+      <div>
+        <div class="chooser-title">Live TradingView Chart</div>
+        <div class="chooser-desc">Full-featured live chart with indicators and drawing tools</div>
+      </div>
+    </div>
+    <div class="chooser-option" onclick="selectChart('setups')">
+      <div class="chooser-icon">📈</div>
+      <div>
+        <div class="chooser-title">My Setups Chart</div>
+        <div class="chooser-desc">Candles with every past BUY/SELL setup marked - tap a marker for details</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="chart-embed-card" id="tvCard">
   <div class="chart-embed-header">
     <h2><span class="live-dot"></span>XAUUSD Live Chart</h2>
   </div>
   <div id="tvChartContainer"></div>
 </div>
 
+<div class="chart-embed-card" id="setupsCard" style="display:none;">
+  <div class="chart-embed-header">
+    <h2><span class="live-dot"></span>My Setups Chart</h2>
+  </div>
+  <div id="setupsChartContainer" style="height:340px; position:relative;"></div>
+  <div class="setups-hint">Tap near a marker to see its Entry / SL / TP details</div>
+  <div id="setupsTooltip" class="setups-tooltip" style="display:none;"></div>
+</div>
+
 <div class="week-panel" id="weekPanel">
-  <h2>\ud83d\udcc5 Last 7 Days</h2>
+  <h2>📅 Last 7 Days</h2>
   <div class="week-grid" id="weekGrid">
-    <div class="week-cell"><div class="num">\u2026</div><div class="lbl">Trades</div></div>
-    <div class="week-cell sl"><div class="num">\u2026</div><div class="lbl">Hit SL</div></div>
-    <div class="week-cell tp"><div class="num">\u2026</div><div class="lbl">Hit TP</div></div>
-    <div class="week-cell"><div class="num">\u2026</div><div class="lbl">Still Open</div></div>
+    <div class="week-cell"><div class="num">...</div><div class="lbl">Trades</div></div>
+    <div class="week-cell sl"><div class="num">...</div><div class="lbl">Hit SL</div></div>
+    <div class="week-cell tp"><div class="num">...</div><div class="lbl">Hit TP</div></div>
+    <div class="week-cell"><div class="num">...</div><div class="lbl">Still Open</div></div>
   </div>
   <div class="week-note" id="weekNote"></div>
 </div>
 
 <div class="stats-strip" id="statsStrip"></div>
 <div class="filters" id="filters"></div>
-<div id="content"><div class="empty"><div class="emoji">\u23f3</div>Loading signals...</div></div>
+<div id="content"><div class="empty"><div class="emoji">⏳</div>Loading signals...</div></div>
 
 <script>
 let allSignals = [];
@@ -387,7 +451,16 @@ function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
   document.getElementById("themeKnob").textContent = t === "light" ? "\u2600\ufe0f" : "\ud83c\udf19";
   localStorage.setItem("theme", t);
-  initTVWidget(t);
+  const choice = localStorage.getItem("chartChoice");
+  if (choice === "tv" && tvScriptLoaded !== undefined) {
+    if (document.getElementById("tvCard").style.display !== "none") initTVWidget(t);
+  } else if (choice === "setups" && window._lwChart) {
+    const isLight = t === "light";
+    window._lwChart.applyOptions({
+      layout: { background: { color: isLight ? "#ffffff" : "#131722" }, textColor: isLight ? "#16181d" : "#d1d4dc" },
+      grid: { vertLines: { color: isLight ? "#e2e6ea" : "#242832" }, horzLines: { color: isLight ? "#e2e6ea" : "#242832" } }
+    });
+  }
 }
 function toggleTheme() {
   const cur = document.documentElement.getAttribute("data-theme") || "dark";
@@ -420,6 +493,134 @@ function initTVWidget(theme) {
   s.src = "https://s3.tradingview.com/tv.js";
   s.onload = function() { tvScriptLoaded = true; draw(); };
   document.body.appendChild(s);
+}
+
+// ============= CHART CHOOSER =============
+function openChooser() {
+  document.getElementById("chooserOverlay").classList.add("show");
+}
+function closeChooser() {
+  document.getElementById("chooserOverlay").classList.remove("show");
+}
+let lwScriptLoaded = false;
+let setupsChartBuilt = false;
+
+function selectChart(which) {
+  localStorage.setItem("chartChoice", which);
+  closeChooser();
+  if (which === "tv") {
+    document.getElementById("tvCard").style.display = "";
+    document.getElementById("setupsCard").style.display = "none";
+    initTVWidget(document.documentElement.getAttribute("data-theme") || "dark");
+  } else {
+    document.getElementById("tvCard").style.display = "none";
+    document.getElementById("setupsCard").style.display = "";
+    initSetupsChart();
+  }
+}
+
+function initSetupsChart() {
+  function build() {
+    if (setupsChartBuilt) { loadSetupsData(); return; }
+    setupsChartBuilt = true;
+    const theme = document.documentElement.getAttribute("data-theme") || "dark";
+    const isLight = theme === "light";
+    window._lwChart = LightweightCharts.createChart(document.getElementById("setupsChartContainer"), {
+      layout: { background: { color: isLight ? "#ffffff" : "#131722" }, textColor: isLight ? "#16181d" : "#d1d4dc" },
+      grid: { vertLines: { color: isLight ? "#e2e6ea" : "#242832" }, horzLines: { color: isLight ? "#e2e6ea" : "#242832" } },
+      timeScale: { timeVisible: true, secondsVisible: false },
+      autoSize: true
+    });
+    window._lwSeries = window._lwChart.addCandlestickSeries({
+      upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
+      wickUpColor: "#26a69a", wickDownColor: "#ef5350"
+    });
+    window._lwChart.subscribeClick(function(param) {
+      showSetupTooltip(param);
+    });
+    loadSetupsData();
+  }
+  if (lwScriptLoaded) { build(); return; }
+  const s = document.createElement("script");
+  s.src = "https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js";
+  s.onload = function() { lwScriptLoaded = true; build(); };
+  document.body.appendChild(s);
+}
+
+async function loadSetupsData() {
+  try {
+    const res = await fetch("/candles");
+    const data = await res.json();
+    const bars = data.bars || [];
+    if (bars.length === 0) return;
+    window._lwSeries.setData(bars);
+
+    const withTime = allSignals.filter(s => s.kind === "signal" && s.time_unix);
+    const markers = withTime.map(s => ({
+      time: s.time_unix,
+      position: s.signal === "BUY" ? "belowBar" : "aboveBar",
+      color: s.signal === "BUY" ? "#3fb950" : "#f85149",
+      shape: s.signal === "BUY" ? "arrowUp" : "arrowDown",
+      text: s.signal
+    })).sort((a, b) => a.time - b.time);
+    window._lwSeries.setMarkers(markers);
+    window._lwSignals = withTime;
+
+    window._lwSeries.priceLines?.forEach(pl => window._lwSeries.removePriceLine(pl));
+    window._lwSeries.priceLines = [];
+    if (withTime.length > 0) {
+      const latest = withTime[withTime.length - 1];
+      const lines = [
+        [parseFloat(latest.entry), "#2962ff", "Entry"],
+        [parseFloat(latest.sl), "#f85149", "SL"],
+        [parseFloat(latest.tp1), "#3fb950", "TP1"],
+        [parseFloat(latest.tp2), "#3fb950", "TP2"],
+        [parseFloat(latest.tp3), "#3fb950", "TP3"]
+      ];
+      lines.forEach(([price, color, title]) => {
+        const pl = window._lwSeries.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, title });
+        window._lwSeries.priceLines.push(pl);
+      });
+    }
+    window._lwChart.timeScale().fitContent();
+  } catch (e) {
+    console.log("Setups chart load failed", e);
+  }
+}
+
+function showSetupTooltip(param) {
+  const tip = document.getElementById("setupsTooltip");
+  if (!param.time || !window._lwSignals || window._lwSignals.length === 0) {
+    tip.style.display = "none";
+    return;
+  }
+  let closest = null, closestDiff = Infinity;
+  window._lwSignals.forEach(s => {
+    const diff = Math.abs(s.time_unix - param.time);
+    if (diff < closestDiff) { closestDiff = diff; closest = s; }
+  });
+  if (!closest || closestDiff > 3600 * 6) {
+    tip.style.display = "none";
+    return;
+  }
+  tip.innerHTML = `
+    <div class="t-title">${closest.signal} - ${closest.time}</div>
+    <div class="t-row"><span class="t-label">Entry</span><span>${closest.entry}</span></div>
+    <div class="t-row"><span class="t-label">SL</span><span>${closest.sl}</span></div>
+    <div class="t-row"><span class="t-label">TP1</span><span>${closest.tp1}</span></div>
+    <div class="t-row"><span class="t-label">TP2</span><span>${closest.tp2}</span></div>
+    <div class="t-row"><span class="t-label">TP3</span><span>${closest.tp3}</span></div>
+  `;
+  tip.style.left = Math.min(param.point.x, 160) + "px";
+  tip.style.top = "10px";
+  tip.style.display = "block";
+}
+
+const savedChoice = localStorage.getItem("chartChoice");
+if (savedChoice) {
+  selectChart(savedChoice);
+} else {
+  openChooser();
 }
 
 applyTheme(localStorage.getItem("theme") || "dark");
@@ -568,6 +769,14 @@ def icon192():
 @app.route("/icon512.png", methods=["GET"])
 def icon512():
     return Response(base64.b64decode(ICON_512_B64), mimetype="image/png")
+
+
+@app.route("/candles", methods=["GET"])
+def candles():
+    bars = fetch_ohlc(outputsize=300)
+    if bars is None:
+        return Response(json.dumps({"bars": []}), mimetype="application/json")
+    return Response(json.dumps({"bars": bars}), mimetype="application/json")
 
 
 @app.route("/stats7d", methods=["GET"])
