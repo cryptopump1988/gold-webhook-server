@@ -1123,6 +1123,117 @@ document.getElementById("f").addEventListener("submit", async function(e){
     return Response(html, mimetype="text/html")
 
 
+SWING_LEN = 5
+ATR_LEN = 14
+SL_BUFFER_MULT = 0.25
+RR = [1.0, 2.0, 3.0]
+
+
+def compute_atr(bars, length):
+    atr = [None] * len(bars)
+    trs = []
+    for i in range(len(bars)):
+        if i == 0:
+            tr = bars[i]["high"] - bars[i]["low"]
+        else:
+            pc = bars[i - 1]["close"]
+            tr = max(bars[i]["high"] - bars[i]["low"], abs(bars[i]["high"] - pc), abs(bars[i]["low"] - pc))
+        trs.append(tr)
+        if i + 1 >= length:
+            if atr[i - 1] is None:
+                atr[i] = sum(trs[i - length + 1:i + 1]) / length
+            else:
+                atr[i] = (atr[i - 1] * (length - 1) + tr) / length
+    return atr
+
+
+def find_pivots(bars, length):
+    n = len(bars)
+    piv_high = [None] * n
+    piv_low = [None] * n
+    for i in range(length, n - length):
+        window = bars[i - length:i + length + 1]
+        h = bars[i]["high"]
+        l = bars[i]["low"]
+        if h == max(b["high"] for b in window):
+            piv_high[i] = h
+        if l == min(b["low"] for b in window):
+            piv_low[i] = l
+    return piv_high, piv_low
+
+
+def detect_choch_signals(bars):
+    if len(bars) < (SWING_LEN * 2 + ATR_LEN + 2):
+        return []
+    piv_high, piv_low = find_pivots(bars, SWING_LEN)
+    atr = compute_atr(bars, ATR_LEN)
+    struct_high = None
+    struct_low = None
+    trend = 0
+    signals = []
+    for i in range(1, len(bars)):
+        if piv_high[i] is not None:
+            struct_high = piv_high[i]
+        if piv_low[i] is not None:
+            struct_low = piv_low[i]
+        if atr[i] is None or struct_high is None or struct_low is None:
+            continue
+        close = bars[i]["close"]
+        prev_close = bars[i - 1]["close"]
+        bullish_choch = (trend != 1) and (prev_close <= struct_high) and (close > struct_high)
+        bearish_choch = (trend != -1) and (prev_close >= struct_low) and (close < struct_low)
+        if bullish_choch:
+            trend = 1
+            entry = close
+            sl = struct_low - atr[i] * SL_BUFFER_MULT
+            risk = abs(entry - sl)
+            signals.append({"time_unix": bars[i]["time"], "signal": "BUY", "entry": entry, "sl": sl,
+                             "tp1": entry + risk * RR[0], "tp2": entry + risk * RR[1], "tp3": entry + risk * RR[2]})
+        elif bearish_choch:
+            trend = -1
+            entry = close
+            sl = struct_high + atr[i] * SL_BUFFER_MULT
+            risk = abs(entry - sl)
+            signals.append({"time_unix": bars[i]["time"], "signal": "SELL", "entry": entry, "sl": sl,
+                             "tp1": entry - risk * RR[0], "tp2": entry - risk * RR[1], "tp3": entry - risk * RR[2]})
+    return signals
+
+
+@app.route("/backfill-historical", methods=["GET"])
+def backfill_historical():
+    bars = fetch_ohlc(outputsize=700)
+    if not bars:
+        return json.dumps({"error": "Could not fetch price history (check TWELVE_DATA_KEY)"}), 500
+
+    detected = detect_choch_signals(bars)
+    if not detected:
+        return json.dumps({"detected": 0, "added": 0, "message": "No CHoCH setups found in the fetched history window"})
+
+    history, sha = gh_load_history()
+    existing_times = set(h.get("time_unix") for h in history if h.get("time_unix"))
+
+    added = 0
+    for s in detected:
+        if s["time_unix"] in existing_times:
+            continue
+        dt_str = datetime.utcfromtimestamp(s["time_unix"]).strftime("%d %b %Y, %H:%M UTC")
+        history.append({
+            "symbol": "XAUUSD", "signal": s["signal"], "kind": "signal",
+            "entry": f'{s["entry"]:.2f}', "sl": f'{s["sl"]:.2f}',
+            "tp1": f'{s["tp1"]:.2f}', "tp2": f'{s["tp2"]:.2f}', "tp3": f'{s["tp3"]:.2f}',
+            "chart_url": "", "time": dt_str, "time_unix": s["time_unix"]
+        })
+        added += 1
+
+    history.sort(key=lambda x: x.get("time_unix", 0), reverse=True)
+    history = history[:MAX_HISTORY]
+    ok = gh_save_history(history, sha)
+    if not ok:
+        return json.dumps({"error": "Detected signals but GitHub save failed - check /debug-github"}), 500
+
+    return json.dumps({"detected": len(detected), "added": added, "already_present": len(detected) - added})
+
+
 @app.route("/add-manual-signal", methods=["POST"])
 def add_manual_signal():
     data = request.get_json(silent=True)
