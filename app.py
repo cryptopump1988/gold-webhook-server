@@ -462,6 +462,7 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
     <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()"><div class="knob" id="themeKnob">🌙</div></div>
     <button class="switch-btn" id="switchBtn" onclick="openChooser()">📊</button>
     <button class="switch-btn" id="notifyBtn" onclick="enablePush()">🔔</button>
+    <button class="switch-btn" id="settingsBtn" onclick="openSettings()">⚙️</button>
     <button class="refresh-btn" id="refreshBtn" onclick="load(true)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0114.6-3.4L21 8M20.5 15a9 9 0 01-14.6 3.4L3 16"/></svg>
       Refresh
@@ -486,6 +487,37 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
         <div class="chooser-title">My Setups Chart</div>
         <div class="chooser-desc">Candles with every past BUY/SELL setup marked - tap a marker for details</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="chooser-overlay" id="settingsOverlay">
+  <div class="chooser-box">
+    <h2>Settings</h2>
+    <p>Notification preferences</p>
+    <div class="chooser-option" onclick="return false;" style="cursor:default;">
+      <div class="chooser-icon" id="settingsPushIcon">🔕</div>
+      <div>
+        <div class="chooser-title" id="settingsPushStatus">Notifications off</div>
+        <div class="chooser-desc" id="settingsPushDesc">Tap below to enable phone alerts for new setups</div>
+      </div>
+    </div>
+    <div class="chooser-option" onclick="enablePush()">
+      <div class="chooser-icon">🔔</div>
+      <div>
+        <div class="chooser-title">Enable Notifications</div>
+        <div class="chooser-desc">Get alerted even when your phone is locked</div>
+      </div>
+    </div>
+    <div class="chooser-option" onclick="toggleSound()">
+      <div class="chooser-icon" id="settingsSoundIcon">🔊</div>
+      <div>
+        <div class="chooser-title" id="settingsSoundTitle">Sound: On</div>
+        <div class="chooser-desc">Play a sound when a new setup card appears in-app</div>
+      </div>
+    </div>
+    <div class="chooser-option" onclick="closeSettings()" style="justify-content:center;">
+      <div class="chooser-title">Close</div>
     </div>
   </div>
 </div>
@@ -579,6 +611,36 @@ function openChooser() {
 }
 function closeChooser() {
   document.getElementById("chooserOverlay").classList.remove("show");
+}
+
+function openSettings() {
+  document.getElementById("settingsOverlay").classList.add("show");
+  refreshSettingsPanel();
+}
+function closeSettings() {
+  document.getElementById("settingsOverlay").classList.remove("show");
+}
+function refreshSettingsPanel() {
+  const icon = document.getElementById("settingsPushIcon");
+  const status = document.getElementById("settingsPushStatus");
+  const desc = document.getElementById("settingsPushDesc");
+  if ("Notification" in window && Notification.permission === "granted") {
+    icon.textContent = "🔔";
+    status.textContent = "Notifications on";
+    desc.textContent = "You'll be alerted even when your phone is locked";
+  } else {
+    icon.textContent = "🔕";
+    status.textContent = "Notifications off";
+    desc.textContent = "Tap below to enable phone alerts for new setups";
+  }
+  const soundOn = localStorage.getItem("soundEnabled") !== "off";
+  document.getElementById("settingsSoundIcon").textContent = soundOn ? "🔊" : "🔇";
+  document.getElementById("settingsSoundTitle").textContent = "Sound: " + (soundOn ? "On" : "Off");
+}
+function toggleSound() {
+  const soundOn = localStorage.getItem("soundEnabled") !== "off";
+  localStorage.setItem("soundEnabled", soundOn ? "off" : "on");
+  refreshSettingsPanel();
 }
 let lwScriptLoaded = false;
 let setupsChartBuilt = false;
@@ -747,6 +809,7 @@ async function enablePush() {
     alert("Could not enable notifications. Please try again.");
   }
   updateNotifyBtn();
+  refreshSettingsPanel();
 }
 
 const savedChoice = localStorage.getItem("chartChoice");
@@ -851,6 +914,23 @@ async function loadWeekStats() {
   }
 }
 
+let lastSeenSignalKey = null;
+function playAlertSound() {
+  if (localStorage.getItem("soundEnabled") === "off") return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (e) {}
+}
+
 async function load(manual) {
   const btn = document.getElementById("refreshBtn");
   if (manual) btn.classList.add("spinning");
@@ -858,6 +938,13 @@ async function load(manual) {
     const res = await fetch("/latest");
     const data = await res.json();
     allSignals = data.signals || [];
+    if (allSignals.length > 0) {
+      const topKey = allSignals[0].time + allSignals[0].signal + allSignals[0].kind;
+      if (lastSeenSignalKey !== null && topKey !== lastSeenSignalKey) {
+        playAlertSound();
+      }
+      lastSeenSignalKey = topKey;
+    }
     renderStats();
     renderFilters();
     renderCards();
