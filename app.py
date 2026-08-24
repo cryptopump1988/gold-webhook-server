@@ -259,32 +259,51 @@ def build_caption(symbol, signal, kind, entry, sl, tp1, tp2, tp3):
     return caption
 
 
-def compute_outcome(sig, bars):
-    # Returns "SL", "TP", or "OPEN" based on which level price reaches first
-    # after the signal's own timestamp, walking the candle history chronologically.
-    # If a single bar's range touches both SL and a TP, SL is assumed first (conservative).
+def compute_outcome_and_excursion(sig, bars):
+    # Returns {"outcome": "SL"/"TP"/"OPEN", "mfe_r": float, "mae_r": float} or None.
+    # mfe_r = best price move in the trade's favor before exit, in R-multiples (risk units).
+    # mae_r = worst price move against the trade before exit, in R-multiples.
+    # Walks candles chronologically from the signal's own timestamp; if a bar's range
+    # touches both SL and TP1, SL is assumed first (conservative, matches prior behavior).
     if "time_unix" not in sig:
         return None
     try:
         entry_t = int(sig["time_unix"])
+        entry_v = float(sig["entry"])
         sl_v = float(sig["sl"])
         tp1_v = float(sig["tp1"])
         direction = sig["signal"]
+        risk = abs(entry_v - sl_v)
+        if risk == 0:
+            return None
     except Exception:
         return None
+
     relevant = [b for b in bars if b["time"] >= entry_t]
+    outcome = "OPEN"
+    mfe_r = 0.0
+    mae_r = 0.0
     for b in relevant:
         if direction == "BUY":
+            favorable = (b["high"] - entry_v) / risk
+            adverse = (entry_v - b["low"]) / risk
             hit_sl = b["low"] <= sl_v
             hit_tp = b["high"] >= tp1_v
         else:
+            favorable = (entry_v - b["low"]) / risk
+            adverse = (b["high"] - entry_v) / risk
             hit_sl = b["high"] >= sl_v
             hit_tp = b["low"] <= tp1_v
+        mfe_r = max(mfe_r, favorable)
+        mae_r = max(mae_r, adverse)
         if hit_sl:
-            return "SL"
+            outcome = "SL"
+            break
         if hit_tp:
-            return "TP"
-    return "OPEN"
+            outcome = "TP"
+            break
+
+    return {"outcome": outcome, "mfe_r": round(mfe_r, 2), "mae_r": round(mae_r, 2)}
 
 
 _stats_cache = {"data": None, "ts": 0}
@@ -302,20 +321,26 @@ def get_7day_stats():
     week_signals = [s for s in history if s.get("kind") == "signal" and s.get("time_unix", 0) >= cutoff]
 
     result = {"total": len(week_signals), "sl_hit": 0, "tp_hit": 0, "open": 0, "untracked": 0}
+    mfe_values, mae_values, mfe_on_losses = [], [], []
 
     if week_signals and TWELVE_DATA_KEY:
         bars = fetch_ohlc(outputsize=700)
         if bars:
             for s in week_signals:
-                outcome = compute_outcome(s, bars)
+                r = compute_outcome_and_excursion(s, bars)
+                if r is None:
+                    result["untracked"] += 1
+                    continue
+                outcome = r["outcome"]
+                mfe_values.append(r["mfe_r"])
+                mae_values.append(r["mae_r"])
                 if outcome == "SL":
                     result["sl_hit"] += 1
+                    mfe_on_losses.append(r["mfe_r"])
                 elif outcome == "TP":
                     result["tp_hit"] += 1
                 elif outcome == "OPEN":
                     result["open"] += 1
-                else:
-                    result["untracked"] += 1
         else:
             result["untracked"] = len(week_signals)
     else:
@@ -323,6 +348,9 @@ def get_7day_stats():
 
     resolved = result["sl_hit"] + result["tp_hit"]
     result["win_rate"] = round(100.0 * result["tp_hit"] / resolved, 1) if resolved > 0 else None
+    result["avg_mfe_r"] = round(sum(mfe_values) / len(mfe_values), 2) if mfe_values else None
+    result["avg_mae_r"] = round(sum(mae_values) / len(mae_values), 2) if mae_values else None
+    result["avg_mfe_r_on_losses"] = round(sum(mfe_on_losses) / len(mfe_on_losses), 2) if mfe_on_losses else None
 
     _stats_cache["data"] = result
     _stats_cache["ts"] = now
@@ -461,7 +489,27 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
 .week-cell .lbl { font-size:10.5px; color:var(--muted); margin-top:3px; }
 .week-cell.sl .num { color:var(--sell); }
 .week-cell.tp .num { color:var(--buy); }
-.week-note { font-size:11px; color:var(--muted); margin-top:10px; text-align:center; }
+.week-note { font-size:11px; color:var(--muted); margin-top:10px; text-align:center; line-height:1.6; }
+.context-panel {
+  margin:14px 16px 0; background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:16px; box-shadow: var(--shadow);
+}
+.context-panel h2 { font-size:14px; margin:0 0 12px; font-weight:700; display:flex; align-items:center; gap:6px; }
+.context-row { display:flex; gap:10px; margin-bottom:12px; }
+.context-cell { flex:1; text-align:center; padding:10px 4px; border-radius:10px; background:var(--card2); }
+.context-cell .num { font-size:18px; font-weight:800; }
+.context-cell .lbl { font-size:10.5px; color:var(--muted); margin-top:3px; }
+.context-cell.trending .num, .context-cell.bullish .num { color:var(--buy); }
+.context-cell.bearish .num { color:var(--sell); }
+.levels-section { margin-top:10px; }
+.levels-title { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.4px; }
+.levels-list { display:flex; flex-wrap:wrap; gap:6px; }
+.level-chip {
+  font-size:11px; padding:4px 9px; border-radius:8px; background:var(--card2); border:1px solid var(--border);
+}
+.level-chip.res { color:var(--sell); }
+.level-chip.sup { color:var(--buy); }
+.context-loading { font-size:12px; color:var(--muted); text-align:center; padding:8px 0; }
 .stat-pill {
   background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 16px;
   min-width:84px; text-align:center; flex-shrink:0; box-shadow: var(--shadow);
@@ -619,6 +667,11 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
     <div class="week-cell"><div class="num">...</div><div class="lbl">Still Open</div></div>
   </div>
   <div class="week-note" id="weekNote"></div>
+</div>
+
+<div class="context-panel" id="contextPanel">
+  <h2>📊 Market Context <span style="font-weight:400;color:var(--muted);font-size:11px">XAUUSD</span></h2>
+  <div id="contextBody"><div class="context-loading">Loading market context…</div></div>
 </div>
 
 <div class="stats-strip" id="statsStrip"></div>
@@ -978,13 +1031,17 @@ async function loadWeekStats() {
     cells[3].textContent = s.open;
     const note = document.getElementById("weekNote");
     if (s.total === 0) {
-      note.textContent = "No setups yet in the last 7 days - this fills in automatically once your indicator fires a signal.";
-    } else if (s.win_rate !== null && s.win_rate !== undefined) {
-      note.textContent = `Win rate: ${s.win_rate}%` + (s.untracked > 0 ? ` · ${s.untracked} not counted (no price history)` : "");
-    } else if (s.untracked > 0) {
-      note.textContent = `${s.untracked} trade(s) not counted (no price history available)`;
+      note.innerHTML = "No setups yet in the last 7 days - this fills in automatically once your indicator fires a signal.";
     } else {
-      note.textContent = "";
+      let parts = [];
+      if (s.win_rate !== null && s.win_rate !== undefined) parts.push(`Win rate: <b>${s.win_rate}%</b>`);
+      if (s.avg_mfe_r !== null && s.avg_mfe_r !== undefined) parts.push(`Avg best move: <b>${s.avg_mfe_r}R</b>`);
+      if (s.avg_mae_r !== null && s.avg_mae_r !== undefined) parts.push(`Avg worst move: <b>${s.avg_mae_r}R</b>`);
+      if (s.avg_mfe_r_on_losses !== null && s.avg_mfe_r_on_losses !== undefined) {
+        parts.push(`Losers moved <b>${s.avg_mfe_r_on_losses}R</b> in your favor before reversing`);
+      }
+      if (s.untracked > 0) parts.push(`${s.untracked} not counted (no price history)`);
+      note.innerHTML = parts.join(" · ") || "";
     }
   } catch (e) {
     document.getElementById("weekNote").textContent = "Could not load weekly results.";
@@ -1042,7 +1099,7 @@ async function loadTicker() {
       const arrow = c.change_pct >= 0 ? "▲" : "▼";
       const priceStr = c.price >= 1 ? c.price.toLocaleString(undefined, {maximumFractionDigits: 2}) : c.price.toPrecision(4);
       const tag = c.type === "gainer" ? '<span class="tgainer-tag">TOP GAINER</span>' : "";
-      const name = c.symbol.replace("USDT", "");
+      const name = c.symbol;
       return `<span class="ticker-item">${tag}<span class="tsym">${name}</span><span class="tprice">$${priceStr}</span><span class="tchange ${dir}">${arrow} ${Math.abs(c.change_pct).toFixed(2)}%</span></span>`;
     };
     // Render the list twice back-to-back so the CSS animation (translateX -50%) loops seamlessly
@@ -1053,11 +1110,59 @@ async function loadTicker() {
   }
 }
 
+async function loadMarketContext() {
+  try {
+    const res = await fetch("/market-context");
+    const m = await res.json();
+    const body = document.getElementById("contextBody");
+
+    if (m.rsi === null || m.rsi === undefined) {
+      body.innerHTML = '<div class="context-loading">Not enough price history yet.</div>';
+      return;
+    }
+
+    const trendClass = m.trend_label === "Trending" ? "trending" : "";
+    const momClass = m.momentum_label === "Bullish" ? "bullish" : (m.momentum_label === "Bearish" ? "bearish" : "");
+
+    let html = `<div class="context-row">
+      <div class="context-cell"><div class="num">${m.rsi}</div><div class="lbl">RSI (14)</div></div>
+      <div class="context-cell ${trendClass}"><div class="num">${m.adx}</div><div class="lbl">ADX · ${m.trend_label || ""}</div></div>
+      <div class="context-cell ${momClass}"><div class="num">${m.momentum_label || "—"}</div><div class="lbl">Momentum</div></div>
+    </div>`;
+
+    if (m.pivots) {
+      html += `<div class="levels-section"><div class="levels-title">Pivot Levels (Daily)</div><div class="levels-list">`;
+      html += `<span class="level-chip res">R3 ${m.pivots.r3.toLocaleString()}</span>`;
+      html += `<span class="level-chip res">R2 ${m.pivots.r2.toLocaleString()}</span>`;
+      html += `<span class="level-chip res">R1 ${m.pivots.r1.toLocaleString()}</span>`;
+      html += `<span class="level-chip">PP ${m.pivots.pp.toLocaleString()}</span>`;
+      html += `<span class="level-chip sup">S1 ${m.pivots.s1.toLocaleString()}</span>`;
+      html += `<span class="level-chip sup">S2 ${m.pivots.s2.toLocaleString()}</span>`;
+      html += `<span class="level-chip sup">S3 ${m.pivots.s3.toLocaleString()}</span>`;
+      html += `</div></div>`;
+    }
+
+    if (m.fib_levels) {
+      html += `<div class="levels-section"><div class="levels-title">Fibonacci Retracements</div><div class="levels-list">`;
+      for (const pct of ["0.236", "0.382", "0.5", "0.618", "0.786"]) {
+        html += `<span class="level-chip">${(parseFloat(pct)*100).toFixed(1)}% ${m.fib_levels[pct].toLocaleString()}</span>`;
+      }
+      html += `</div></div>`;
+    }
+
+    body.innerHTML = html;
+  } catch (e) {
+    document.getElementById("contextBody").innerHTML = '<div class="context-loading">Could not load market context.</div>';
+  }
+}
+
 load();
 loadTicker();
 loadWeekStats();
+loadMarketContext();
 setInterval(load, 20000);
 setInterval(loadTicker, 30000);
+setInterval(loadMarketContext, 60000);
 document.getElementById("refreshBtn").addEventListener("click", loadWeekStats);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
@@ -1202,6 +1307,89 @@ SWING_LEN = 5
 ATR_LEN = 14
 SL_BUFFER_MULT = 0.25
 RR = [1.0, 2.0, 3.0]
+
+
+def compute_rsi(bars, length=14):
+    closes = [b["close"] for b in bars]
+    n = len(closes)
+    rsi = [None] * n
+    if n < length + 1:
+        return rsi
+    gains, losses = [], []
+    for i in range(1, n):
+        change = closes[i] - closes[i - 1]
+        gains.append(max(change, 0))
+        losses.append(max(-change, 0))
+    avg_gain = sum(gains[:length]) / length
+    avg_loss = sum(losses[:length]) / length
+    rsi[length] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
+    for i in range(length + 1, n):
+        g = gains[i - 1]
+        l = losses[i - 1]
+        avg_gain = (avg_gain * (length - 1) + g) / length
+        avg_loss = (avg_loss * (length - 1) + l) / length
+        rsi[i] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
+    return rsi
+
+
+def compute_adx(bars, length=14):
+    n = len(bars)
+    adx = [None] * n
+    if n < length * 2 + 1:
+        return adx
+    plus_dm, minus_dm, tr = [0.0], [0.0], [0.0]
+    for i in range(1, n):
+        up_move = bars[i]["high"] - bars[i - 1]["high"]
+        down_move = bars[i - 1]["low"] - bars[i]["low"]
+        plus_dm.append(up_move if (up_move > down_move and up_move > 0) else 0.0)
+        minus_dm.append(down_move if (down_move > up_move and down_move > 0) else 0.0)
+        pc = bars[i - 1]["close"]
+        tr.append(max(bars[i]["high"] - bars[i]["low"], abs(bars[i]["high"] - pc), abs(bars[i]["low"] - pc)))
+
+    def wilder_smooth(vals, length):
+        sm = [None] * len(vals)
+        sm[length] = sum(vals[1:length + 1])
+        for i in range(length + 1, len(vals)):
+            sm[i] = sm[i - 1] - (sm[i - 1] / length) + vals[i]
+        return sm
+
+    sm_plus_dm = wilder_smooth(plus_dm, length)
+    sm_minus_dm = wilder_smooth(minus_dm, length)
+    sm_tr = wilder_smooth(tr, length)
+    dx = [None] * n
+    for i in range(length, n):
+        if sm_tr[i] in (None, 0):
+            continue
+        plus_di = 100 * sm_plus_dm[i] / sm_tr[i]
+        minus_di = 100 * sm_minus_dm[i] / sm_tr[i]
+        denom = plus_di + minus_di
+        dx[i] = 100 * abs(plus_di - minus_di) / denom if denom != 0 else 0
+    first_adx_idx = None
+    for i in range(length * 2, n):
+        window = [v for v in dx[i - length + 1:i + 1] if v is not None]
+        if len(window) == length:
+            adx[i] = sum(window) / length
+            first_adx_idx = i
+            break
+    if first_adx_idx is not None:
+        for i in range(first_adx_idx + 1, n):
+            if dx[i] is not None:
+                adx[i] = (adx[i - 1] * (length - 1) + dx[i]) / length
+    return adx
+
+
+def compute_pivot_points(prev_high, prev_low, prev_close):
+    pp = (prev_high + prev_low + prev_close) / 3
+    return {
+        "pp": pp,
+        "r1": 2 * pp - prev_low, "r2": pp + (prev_high - prev_low), "r3": prev_high + 2 * (pp - prev_low),
+        "s1": 2 * pp - prev_high, "s2": pp - (prev_high - prev_low), "s3": prev_low - 2 * (prev_high - pp),
+    }
+
+
+def compute_fib_retracements(swing_high, swing_low):
+    diff = swing_high - swing_low
+    return {str(pct): swing_high - diff * pct for pct in [0.236, 0.382, 0.5, 0.618, 0.786]}
 
 
 def compute_atr(bars, length):
@@ -1404,14 +1592,85 @@ def debug_github():
     return Response(json.dumps(result, indent=2), mimetype="application/json")
 
 
+@app.route("/market-context", methods=["GET"])
+def market_context():
+    result = {}
+
+    bars15 = fetch_ohlc(interval="15min", outputsize=300)
+    if bars15 and len(bars15) > 40:
+        rsi_series = compute_rsi(bars15)
+        adx_series = compute_adx(bars15)
+        latest_rsi = next((v for v in reversed(rsi_series) if v is not None), None)
+        latest_adx = next((v for v in reversed(adx_series) if v is not None), None)
+        result["rsi"] = round(latest_rsi, 1) if latest_rsi is not None else None
+        result["adx"] = round(latest_adx, 1) if latest_adx is not None else None
+        result["current_price"] = bars15[-1]["close"]
+
+        if result["rsi"] is not None:
+            if result["rsi"] >= 60:
+                result["momentum_label"] = "Bullish"
+            elif result["rsi"] <= 40:
+                result["momentum_label"] = "Bearish"
+            else:
+                result["momentum_label"] = "Neutral"
+        if result["adx"] is not None:
+            result["trend_label"] = "Trending" if result["adx"] >= 25 else "Ranging"
+
+        swing_high = max(b["high"] for b in bars15)
+        swing_low = min(b["low"] for b in bars15)
+        result["swing_high"] = swing_high
+        result["swing_low"] = swing_low
+        result["fib_levels"] = {k: round(v, 2) for k, v in compute_fib_retracements(swing_high, swing_low).items()}
+    else:
+        result["rsi"] = None
+        result["adx"] = None
+
+    daily_bars = fetch_ohlc(interval="1day", outputsize=5)
+    if daily_bars and len(daily_bars) >= 2:
+        prev_day = daily_bars[-2]
+        piv = compute_pivot_points(prev_day["high"], prev_day["low"], prev_day["close"])
+        result["pivots"] = {k: round(v, 2) for k, v in piv.items()}
+    else:
+        result["pivots"] = None
+
+    return Response(json.dumps(result), mimetype="application/json")
+
+
 CRYPTO_TICKER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "SOLUSDT",
                           "TRXUSDT", "HYPEUSDT", "DOGEUSDT", "ZECUSDT"]
-LEVERAGED_TOKEN_MARKERS = ["UPUSDT", "DOWNUSDT", "BULLUSDT", "BEARUSDT"]
+COINGECKO_ID_MAP = {
+    "BTCUSDT": ("bitcoin", "BTC"), "ETHUSDT": ("ethereum", "ETH"), "BNBUSDT": ("binancecoin", "BNB"),
+    "XRPUSDT": ("ripple", "XRP"), "SOLUSDT": ("solana", "SOL"), "TRXUSDT": ("tron", "TRX"),
+    "HYPEUSDT": ("hyperliquid", "HYPE"), "DOGEUSDT": ("dogecoin", "DOGE"), "ZECUSDT": ("zcash", "ZEC"),
+}
 TOP_GAINERS_COUNT = 8
-MIN_QUOTE_VOLUME_USDT = 5_000_000  # filters out illiquid/low-volume noise from top gainers
+MIN_MARKET_CAP_USD = 20_000_000  # filters out illiquid/low-cap noise from top gainers
 
 _crypto_cache = {"data": None, "ts": 0}
-CRYPTO_CACHE_TTL = 30  # seconds - avoid hammering Binance on every client poll
+CRYPTO_CACHE_TTL = 60  # seconds - gentle on CoinGecko's free-tier rate limits
+
+
+def _fetch_coingecko_markets(**params):
+    base = {"vs_currency": "usd", "price_change_percentage": "24h"}
+    base.update(params)
+    r = requests.get("https://api.coingecko.com/api/v3/coins/markets", params=base, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+@app.route("/debug-crypto", methods=["GET"])
+def debug_crypto():
+    result = {}
+    try:
+        main_ids = ",".join(v[0] for v in COINGECKO_ID_MAP.values())
+        data = _fetch_coingecko_markets(ids=main_ids, per_page=50)
+        result["main_coins_fetch_success"] = True
+        result["main_coins_count"] = len(data)
+        result["sample"] = data[0] if data else None
+    except Exception as e:
+        result["main_coins_fetch_success"] = False
+        result["error"] = repr(e)
+    return Response(json.dumps(result, indent=2, default=str), mimetype="application/json")
 
 
 @app.route("/crypto-ticker", methods=["GET"])
@@ -1421,51 +1680,43 @@ def crypto_ticker():
     if _crypto_cache["data"] is not None and (now - _crypto_cache["ts"]) < CRYPTO_CACHE_TTL:
         return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
 
-    try:
-        r = requests.get("https://api.binance.com/api/v3/ticker/24hr", timeout=15)
-        r.raise_for_status()
-        all_tickers = r.json()
-    except Exception as e:
-        print("Crypto ticker bulk fetch failed:", e)
-        # serve stale cache if we have one, rather than a hard failure
-        if _crypto_cache["data"] is not None:
-            return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
-        return Response(json.dumps({"coins": []}), mimetype="application/json")
-
-    by_symbol = {}
-    for d in all_tickers:
-        sym = d.get("symbol", "")
-        if not sym.endswith("USDT"):
-            continue
-        if any(marker in sym for marker in LEVERAGED_TOKEN_MARKERS):
-            continue
-        try:
-            by_symbol[sym] = {
-                "symbol": sym,
-                "price": float(d["lastPrice"]),
-                "change_pct": float(d["priceChangePercent"]),
-                "quote_volume": float(d.get("quoteVolume", 0)),
-            }
-        except (KeyError, ValueError, TypeError):
-            continue
-
     results = []
-    for sym in CRYPTO_TICKER_SYMBOLS:
-        if sym in by_symbol:
-            entry = dict(by_symbol[sym])
-            entry["type"] = "main"
-            results.append(entry)
+    try:
+        main_ids = ",".join(v[0] for v in COINGECKO_ID_MAP.values())
+        main_data = _fetch_coingecko_markets(ids=main_ids, per_page=50)
+        by_id = {d["id"]: d for d in main_data}
+        for sym, (gecko_id, label) in COINGECKO_ID_MAP.items():
+            d = by_id.get(gecko_id)
+            if not d or d.get("current_price") is None or d.get("price_change_percentage_24h") is None:
+                continue
+            results.append({
+                "symbol": label, "price": float(d["current_price"]),
+                "change_pct": float(d["price_change_percentage_24h"]), "type": "main"
+            })
+    except Exception as e:
+        print("Crypto ticker main-coins fetch failed:", repr(e))
 
-    main_symbols = set(CRYPTO_TICKER_SYMBOLS)
-    gainer_candidates = [
-        v for sym, v in by_symbol.items()
-        if sym not in main_symbols and v["quote_volume"] >= MIN_QUOTE_VOLUME_USDT and v["change_pct"] > 0
-    ]
-    gainer_candidates.sort(key=lambda v: v["change_pct"], reverse=True)
-    for entry in gainer_candidates[:TOP_GAINERS_COUNT]:
-        e = dict(entry)
-        e["type"] = "gainer"
-        results.append(e)
+    try:
+        top_data = _fetch_coingecko_markets(order="market_cap_desc", per_page=100, page=1)
+        main_gecko_ids = set(v[0] for v in COINGECKO_ID_MAP.values())
+        gainer_candidates = [
+            d for d in top_data
+            if d["id"] not in main_gecko_ids
+            and d.get("price_change_percentage_24h") is not None
+            and d.get("market_cap") and d["market_cap"] >= MIN_MARKET_CAP_USD
+            and d["price_change_percentage_24h"] > 0
+        ]
+        gainer_candidates.sort(key=lambda d: d["price_change_percentage_24h"], reverse=True)
+        for d in gainer_candidates[:TOP_GAINERS_COUNT]:
+            results.append({
+                "symbol": d["symbol"].upper(), "price": float(d["current_price"]),
+                "change_pct": float(d["price_change_percentage_24h"]), "type": "gainer"
+            })
+    except Exception as e:
+        print("Crypto ticker gainers fetch failed:", repr(e))
+
+    if not results and _crypto_cache["data"] is not None:
+        return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
 
     _crypto_cache["data"] = results
     _crypto_cache["ts"] = now
