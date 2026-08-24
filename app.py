@@ -4,6 +4,7 @@ import os
 import json
 import base64
 from datetime import datetime
+from pywebpush import webpush, WebPushException
 
 app = Flask(__name__)
 
@@ -13,7 +14,12 @@ TWELVE_DATA_KEY = os.environ.get("TWELVE_DATA_KEY", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "")  # format: username/gold-webhook-server
 HISTORY_PATH = "data/history.json"
+SUBS_PATH = "data/subscriptions.json"
 MAX_HISTORY = 100
+
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "mailto:admin@bakalestrading.app")
 
 TELEGRAM_SEND_MSG_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 TELEGRAM_SEND_PHOTO_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
@@ -67,6 +73,65 @@ def gh_save_history(history_list, sha):
     return r.status_code in (200, 201)
 
 
+def gh_load_json(path):
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        return [], None
+    url = "https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + path
+    r = requests.get(url, headers=gh_headers(), timeout=15)
+    if r.status_code == 200:
+        j = r.json()
+        content = base64.b64decode(j["content"]).decode("utf-8")
+        try:
+            data = json.loads(content)
+        except Exception:
+            data = []
+        return data, j["sha"]
+    return [], None
+
+
+def gh_save_json(path, data_list, sha):
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        return False
+    url = "https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + path
+    content_str = json.dumps(data_list, indent=2)
+    content_b64 = base64.b64encode(content_str.encode("utf-8")).decode("utf-8")
+    body = {"message": "Update " + path, "content": content_b64, "branch": "main"}
+    if sha:
+        body["sha"] = sha
+    r = requests.put(url, headers=gh_headers(), json=body, timeout=15)
+    return r.status_code in (200, 201)
+
+
+def send_push_to_all(title, body_text, url_path="/"):
+    subs, sha = gh_load_json(SUBS_PATH)
+    if not subs or not VAPID_PRIVATE_KEY:
+        return
+    payload = json.dumps({"title": title, "body": body_text, "url": url_path})
+    still_valid = []
+    changed = False
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info=sub,
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={"sub": VAPID_CLAIMS_EMAIL}
+            )
+            still_valid.append(sub)
+        except WebPushException as e:
+            status = e.response.status_code if e.response is not None else None
+            if status in (404, 410):
+                changed = True  # expired subscription, drop it
+            else:
+                still_valid.append(sub)
+                print("Push send failed (kept):", e)
+        except Exception as e:
+            still_valid.append(sub)
+            print("Push send error (kept):", e)
+    if changed:
+        gh_save_json(SUBS_PATH, still_valid, sha)
+
+
 def fetch_closes(symbol="XAU/USD", interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": TWELVE_DATA_KEY, "format": "JSON"}
@@ -82,18 +147,27 @@ def fetch_closes(symbol="XAU/USD", interval="15min", outputsize=200):
 
 def fetch_ohlc(symbol="XAU/USD", interval="15min", outputsize=700):
     import time as _time
+    if not TWELVE_DATA_KEY:
+        return None
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": TWELVE_DATA_KEY, "format": "JSON"}
-    r = requests.get(url, params=params, timeout=25)
-    data = r.json()
+    try:
+        r = requests.get(url, params=params, timeout=25)
+        data = r.json()
+    except Exception as e:
+        print("Twelve Data request failed:", e)
+        return None
     if "values" not in data:
         print("Twelve Data error:", data)
         return None
     values = list(reversed(data["values"]))
     bars = []
     for v in values:
-        t = int(_time.mktime(_time.strptime(v["datetime"], "%Y-%m-%d %H:%M:%S")))
-        bars.append({"time": t, "open": float(v["open"]), "high": float(v["high"]), "low": float(v["low"]), "close": float(v["close"])})
+        try:
+            t = int(_time.mktime(_time.strptime(v["datetime"], "%Y-%m-%d %H:%M:%S")))
+            bars.append({"time": t, "open": float(v["open"]), "high": float(v["high"]), "low": float(v["low"]), "close": float(v["close"])})
+        except Exception:
+            continue
     return bars
 
 
@@ -203,6 +277,9 @@ def get_7day_stats():
             result["untracked"] = len(week_signals)
     else:
         result["untracked"] = len(week_signals)
+
+    resolved = result["sl_hit"] + result["tp_hit"]
+    result["win_rate"] = round(100.0 * result["tp_hit"] / resolved, 1) if resolved > 0 else None
 
     _stats_cache["data"] = result
     _stats_cache["ts"] = now
@@ -384,6 +461,7 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
   <div class="header-actions">
     <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()"><div class="knob" id="themeKnob">🌙</div></div>
     <button class="switch-btn" id="switchBtn" onclick="openChooser()">📊</button>
+    <button class="switch-btn" id="notifyBtn" onclick="enablePush()">🔔</button>
     <button class="refresh-btn" id="refreshBtn" onclick="load(true)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0114.6-3.4L21 8M20.5 15a9 9 0 01-14.6 3.4L3 16"/></svg>
       Refresh
@@ -616,6 +694,61 @@ function showSetupTooltip(param) {
   tip.style.display = "block";
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function updateNotifyBtn() {
+  const btn = document.getElementById("notifyBtn");
+  if (!("Notification" in window)) { btn.style.display = "none"; return; }
+  if (Notification.permission === "granted") {
+    btn.textContent = "🔔";
+    btn.title = "Notifications enabled";
+  } else {
+    btn.textContent = "🔕";
+    btn.title = "Tap to enable notifications";
+  }
+}
+
+async function enablePush() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    alert("Push notifications aren't supported in this browser.");
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      updateNotifyBtn();
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const keyRes = await fetch("/vapid-public-key");
+    const keyData = await keyRes.json();
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyData.key)
+      });
+    }
+    await fetch("/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(sub)
+    });
+    updateNotifyBtn();
+  } catch (e) {
+    console.log("Push subscribe failed", e);
+    alert("Could not enable notifications. Please try again.");
+  }
+  updateNotifyBtn();
+}
+
 const savedChoice = localStorage.getItem("chartChoice");
 if (savedChoice) {
   selectChart(savedChoice);
@@ -704,7 +837,15 @@ async function loadWeekStats() {
     cells[2].textContent = s.tp_hit;
     cells[3].textContent = s.open;
     const note = document.getElementById("weekNote");
-    note.textContent = s.untracked > 0 ? `${s.untracked} trade(s) not counted (no price history available)` : "";
+    if (s.total === 0) {
+      note.textContent = "No setups yet in the last 7 days - this fills in automatically once your indicator fires a signal.";
+    } else if (s.win_rate !== null && s.win_rate !== undefined) {
+      note.textContent = `Win rate: ${s.win_rate}%` + (s.untracked > 0 ? ` · ${s.untracked} not counted (no price history)` : "");
+    } else if (s.untracked > 0) {
+      note.textContent = `${s.untracked} trade(s) not counted (no price history available)`;
+    } else {
+      note.textContent = "";
+    }
   } catch (e) {
     document.getElementById("weekNote").textContent = "Could not load weekly results.";
   }
@@ -732,6 +873,7 @@ document.getElementById("refreshBtn").addEventListener("click", loadWeekStats);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
+updateNotifyBtn();
 </script>
 </body>
 </html>"""
@@ -757,7 +899,35 @@ def manifest():
 
 @app.route("/sw.js", methods=["GET"])
 def sw():
-    js = "self.addEventListener('fetch', function(e){});"
+    js = """
+self.addEventListener('fetch', function(e){});
+
+self.addEventListener('push', function(event) {
+  let data = { title: 'Bakale\\'s Trading', body: 'New signal available', url: '/' };
+  try { data = event.data.json(); } catch (e) {}
+  const options = {
+    body: data.body,
+    icon: '/icon192.png',
+    badge: '/icon192.png',
+    vibrate: [200, 100, 200],
+    data: { url: data.url || '/' }
+  };
+  event.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  const url = event.notification.data && event.notification.data.url ? event.notification.data.url : '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(function(clientList) {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) return client.focus();
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
+  );
+});
+"""
     return Response(js, mimetype="application/javascript")
 
 
@@ -769,6 +939,28 @@ def icon192():
 @app.route("/icon512.png", methods=["GET"])
 def icon512():
     return Response(base64.b64decode(ICON_512_B64), mimetype="image/png")
+
+
+@app.route("/ping", methods=["GET"])
+def ping():
+    return "pong", 200
+
+
+@app.route("/vapid-public-key", methods=["GET"])
+def vapid_public_key():
+    return Response(json.dumps({"key": VAPID_PUBLIC_KEY}), mimetype="application/json")
+
+
+@app.route("/subscribe", methods=["POST"])
+def subscribe():
+    sub = request.get_json(silent=True)
+    if not sub or "endpoint" not in sub:
+        return "Invalid subscription", 400
+    subs, sha = gh_load_json(SUBS_PATH)
+    if not any(s.get("endpoint") == sub.get("endpoint") for s in subs):
+        subs.append(sub)
+        gh_save_json(SUBS_PATH, subs, sha)
+    return "OK", 200
 
 
 @app.route("/candles", methods=["GET"])
@@ -851,6 +1043,14 @@ def webhook():
         gh_save_history(history, sha)
     except Exception as e:
         print("GitHub history save failed:", e)
+
+    try:
+        push_dot = "🟢" if signal == "BUY" else "🔴"
+        push_title = push_dot + " " + signal + (" Setup" if kind == "signal" else " Zone Touched Again")
+        push_body = "Entry " + entry + " | SL " + sl + " | TP1 " + tp1
+        send_push_to_all(push_title, push_body, "/")
+    except Exception as e:
+        print("Push notification failed:", e)
 
     return "OK", 200
 
