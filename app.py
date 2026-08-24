@@ -127,7 +127,7 @@ def build_caption(symbol, signal, kind, entry, sl, tp1, tp2, tp3):
 
 @app.route("/", methods=["GET"])
 def home():
-    html = """<!DOCTYPE html>
+    html = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
