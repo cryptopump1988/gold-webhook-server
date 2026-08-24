@@ -436,8 +436,8 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
 .ticker-item {
   display:inline-flex; align-items:center; gap:6px; padding:0 18px; font-size:13px; flex-shrink:0;
 }
-.ticker-item .tsym { font-weight:800; color:#0ff; text-shadow: 0 0 5px rgba(0,255,255,0.9), 0 0 10px rgba(0,255,255,0.5); }
-.ticker-item .tprice { color:#0ff; text-shadow: 0 0 4px rgba(0,255,255,0.7); font-weight:600; }
+.ticker-item .tsym { font-weight:800; color:#39ff14; text-shadow: 0 0 6px rgba(57,255,20,0.95), 0 0 14px rgba(57,255,20,0.6); }
+.ticker-item .tprice { color:#39ff14; text-shadow: 0 0 5px rgba(57,255,20,0.8); font-weight:600; }
 .ticker-item .tchange.up { color:#26a69a; font-weight:600; }
 .ticker-item .tchange.down { color:#ef5350; font-weight:600; }
 .ticker-item .tgainer-tag {
