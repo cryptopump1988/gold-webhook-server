@@ -1147,65 +1147,87 @@ def compute_atr(bars, length):
     return atr
 
 
-def find_pivots(bars, length):
-    n = len(bars)
-    piv_high = [None] * n
-    piv_low = [None] * n
+def find_pivots_15m(bars15, length):
+    """Returns confirmed pivot events (onset_time, pivot_high_or_None, pivot_low_or_None).
+    onset_time is 'length' bars after the pivot bar itself, matching request.security(lookahead_off)
+    non-repainting behavior - the structure level isn't knowable until confirmed."""
+    n = len(bars15)
+    confirmed = []
     for i in range(length, n - length):
-        window = bars[i - length:i + length + 1]
-        h = bars[i]["high"]
-        l = bars[i]["low"]
-        if h == max(b["high"] for b in window):
-            piv_high[i] = h
-        if l == min(b["low"] for b in window):
-            piv_low[i] = l
-    return piv_high, piv_low
+        window = bars15[i - length:i + length + 1]
+        h = bars15[i]["high"]
+        l = bars15[i]["low"]
+        ph = h if h == max(b["high"] for b in window) else None
+        pl = l if l == min(b["low"] for b in window) else None
+        if ph is not None or pl is not None:
+            onset_index = i + length
+            if onset_index < n:
+                confirmed.append((bars15[onset_index]["time"], ph, pl))
+    confirmed.sort(key=lambda x: x[0])
+    return confirmed
 
 
-def detect_choch_signals(bars):
-    if len(bars) < (SWING_LEN * 2 + ATR_LEN + 2):
+def detect_choch_signals_dual_tf(bars15, bars1):
+    """Structure from 15M pivots, CHoCH break checked on 1-minute closes -
+    matches the live indicator's 'CONFIRMATION (1M)' mode exactly."""
+    if len(bars15) < (SWING_LEN * 2 + 2) or len(bars1) < ATR_LEN + 2:
         return []
-    piv_high, piv_low = find_pivots(bars, SWING_LEN)
-    atr = compute_atr(bars, ATR_LEN)
+
+    pivot_events = find_pivots_15m(bars15, SWING_LEN)
+    atr1 = compute_atr(bars1, ATR_LEN)
+
     struct_high = None
     struct_low = None
     trend = 0
     signals = []
-    for i in range(1, len(bars)):
-        if piv_high[i] is not None:
-            struct_high = piv_high[i]
-        if piv_low[i] is not None:
-            struct_low = piv_low[i]
-        if atr[i] is None or struct_high is None or struct_low is None:
+    pivot_idx = 0
+    n_pivots = len(pivot_events)
+
+    for i in range(1, len(bars1)):
+        t = bars1[i]["time"]
+        while pivot_idx < n_pivots and pivot_events[pivot_idx][0] <= t:
+            _, ph, pl = pivot_events[pivot_idx]
+            if ph is not None:
+                struct_high = ph
+            if pl is not None:
+                struct_low = pl
+            pivot_idx += 1
+
+        if atr1[i] is None or struct_high is None or struct_low is None:
             continue
-        close = bars[i]["close"]
-        prev_close = bars[i - 1]["close"]
+
+        close = bars1[i]["close"]
+        prev_close = bars1[i - 1]["close"]
+
         bullish_choch = (trend != 1) and (prev_close <= struct_high) and (close > struct_high)
         bearish_choch = (trend != -1) and (prev_close >= struct_low) and (close < struct_low)
+
         if bullish_choch:
             trend = 1
             entry = close
-            sl = struct_low - atr[i] * SL_BUFFER_MULT
+            sl = struct_low - atr1[i] * SL_BUFFER_MULT
             risk = abs(entry - sl)
-            signals.append({"time_unix": bars[i]["time"], "signal": "BUY", "entry": entry, "sl": sl,
+            signals.append({"time_unix": t, "signal": "BUY", "entry": entry, "sl": sl,
                              "tp1": entry + risk * RR[0], "tp2": entry + risk * RR[1], "tp3": entry + risk * RR[2]})
         elif bearish_choch:
             trend = -1
             entry = close
-            sl = struct_high + atr[i] * SL_BUFFER_MULT
+            sl = struct_high + atr1[i] * SL_BUFFER_MULT
             risk = abs(entry - sl)
-            signals.append({"time_unix": bars[i]["time"], "signal": "SELL", "entry": entry, "sl": sl,
+            signals.append({"time_unix": t, "signal": "SELL", "entry": entry, "sl": sl,
                              "tp1": entry - risk * RR[0], "tp2": entry - risk * RR[1], "tp3": entry - risk * RR[2]})
+
     return signals
 
 
 @app.route("/backfill-historical", methods=["GET"])
 def backfill_historical():
-    bars = fetch_ohlc(outputsize=700)
-    if not bars:
+    bars15 = fetch_ohlc(interval="15min", outputsize=700)
+    bars1 = fetch_ohlc(interval="1min", outputsize=5000)
+    if not bars15 or not bars1:
         return json.dumps({"error": "Could not fetch price history (check TWELVE_DATA_KEY)"}), 500
 
-    detected = detect_choch_signals(bars)
+    detected = detect_choch_signals_dual_tf(bars15, bars1)
     if not detected:
         return json.dumps({"detected": 0, "added": 0, "message": "No CHoCH setups found in the fetched history window"})
 
@@ -1231,7 +1253,10 @@ def backfill_historical():
     if not ok:
         return json.dumps({"error": "Detected signals but GitHub save failed - check /debug-github"}), 500
 
-    return json.dumps({"detected": len(detected), "added": added, "already_present": len(detected) - added})
+    return json.dumps({
+        "detected": len(detected), "added": added, "already_present": len(detected) - added,
+        "bars_used": {"15min": len(bars15), "1min": len(bars1)}
+    })
 
 
 @app.route("/add-manual-signal", methods=["POST"])
