@@ -1161,7 +1161,7 @@ loadTicker();
 loadWeekStats();
 loadMarketContext();
 setInterval(load, 20000);
-setInterval(loadTicker, 30000);
+setInterval(loadTicker, 120000);
 setInterval(loadMarketContext, 60000);
 document.getElementById("refreshBtn").addEventListener("click", loadWeekStats);
 if ("serviceWorker" in navigator) {
@@ -1647,7 +1647,7 @@ TOP_GAINERS_COUNT = 8
 MIN_MARKET_CAP_USD = 20_000_000  # filters out illiquid/low-cap noise from top gainers
 
 _crypto_cache = {"data": None, "ts": 0}
-CRYPTO_CACHE_TTL = 60  # seconds - gentle on CoinGecko's free-tier rate limits
+CRYPTO_CACHE_TTL = 300  # seconds - a shared free-tier IP hits CoinGecko's rate limit fast, so cache generously
 
 
 def _fetch_coingecko_markets(**params):
@@ -1680,11 +1680,14 @@ def crypto_ticker():
     if _crypto_cache["data"] is not None and (now - _crypto_cache["ts"]) < CRYPTO_CACHE_TTL:
         return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
 
-    results = []
     try:
-        main_ids = ",".join(v[0] for v in COINGECKO_ID_MAP.values())
-        main_data = _fetch_coingecko_markets(ids=main_ids, per_page=50)
-        by_id = {d["id"]: d for d in main_data}
+        # Single combined call instead of two - halves the rate-limit pressure on
+        # CoinGecko's shared-IP free tier. Top 250 by market cap covers both our
+        # main coins (all well within top 250) and the gainers pool.
+        top_data = _fetch_coingecko_markets(order="market_cap_desc", per_page=250, page=1)
+        by_id = {d["id"]: d for d in top_data}
+
+        results = []
         for sym, (gecko_id, label) in COINGECKO_ID_MAP.items():
             d = by_id.get(gecko_id)
             if not d or d.get("current_price") is None or d.get("price_change_percentage_24h") is None:
@@ -1693,11 +1696,7 @@ def crypto_ticker():
                 "symbol": label, "price": float(d["current_price"]),
                 "change_pct": float(d["price_change_percentage_24h"]), "type": "main"
             })
-    except Exception as e:
-        print("Crypto ticker main-coins fetch failed:", repr(e))
 
-    try:
-        top_data = _fetch_coingecko_markets(order="market_cap_desc", per_page=100, page=1)
         main_gecko_ids = set(v[0] for v in COINGECKO_ID_MAP.values())
         gainer_candidates = [
             d for d in top_data
@@ -1712,15 +1711,19 @@ def crypto_ticker():
                 "symbol": d["symbol"].upper(), "price": float(d["current_price"]),
                 "change_pct": float(d["price_change_percentage_24h"]), "type": "gainer"
             })
+
+        if results:
+            _crypto_cache["data"] = results
+            _crypto_cache["ts"] = now
+            return Response(json.dumps({"coins": results}), mimetype="application/json")
     except Exception as e:
-        print("Crypto ticker gainers fetch failed:", repr(e))
+        print("Crypto ticker fetch failed:", repr(e))
 
-    if not results and _crypto_cache["data"] is not None:
-        return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
-
-    _crypto_cache["data"] = results
-    _crypto_cache["ts"] = now
-    return Response(json.dumps({"coins": results}), mimetype="application/json")
+    # Any failure (rate limit, network issue, etc.) - serve the last successful
+    # result regardless of how stale it is, rather than showing nothing.
+    if _crypto_cache["data"] is not None:
+        return Response(json.dumps({"coins": _crypto_cache["data"], "stale": True}), mimetype="application/json")
+    return Response(json.dumps({"coins": []}), mimetype="application/json")
 
 
 
