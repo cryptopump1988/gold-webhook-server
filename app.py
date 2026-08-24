@@ -436,8 +436,8 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
 .ticker-item {
   display:inline-flex; align-items:center; gap:6px; padding:0 18px; font-size:13px; flex-shrink:0;
 }
-.ticker-item .tsym { font-weight:700; color:var(--text); }
-.ticker-item .tprice { color:var(--text-dim); }
+.ticker-item .tsym { font-weight:800; color:#0ff; text-shadow: 0 0 5px rgba(0,255,255,0.9), 0 0 10px rgba(0,255,255,0.5); }
+.ticker-item .tprice { color:#0ff; text-shadow: 0 0 4px rgba(0,255,255,0.7); font-weight:600; }
 .ticker-item .tchange.up { color:#26a69a; font-weight:600; }
 .ticker-item .tchange.down { color:#ef5350; font-weight:600; }
 .ticker-item .tgainer-tag {
@@ -1638,7 +1638,8 @@ def market_context():
 
 TWELVE_DATA_CRYPTO_MAP = {
     "BTC/USD": "BTC", "ETH/USD": "ETH", "BNB/USD": "BNB", "XRP/USD": "XRP", "SOL/USD": "SOL",
-    "TRX/USD": "TRX", "HYPE/USD": "HYPE", "DOGE/USD": "DOGE", "ZEC/USD": "ZEC",
+    "TRX/USD": "TRX", "DOGE/USD": "DOGE", "ADA/USD": "ADA", "DOT/USD": "DOT", "LINK/USD": "LINK",
+    "AVAX/USD": "AVAX", "LTC/USD": "LTC", "ATOM/USD": "ATOM", "NEAR/USD": "NEAR", "SUI/USD": "SUI",
 }
 COINGECKO_ID_MAP = {
     "BTCUSDT": ("bitcoin", "BTC"), "ETHUSDT": ("ethereum", "ETH"), "BNBUSDT": ("binancecoin", "BNB"),
@@ -1649,17 +1650,20 @@ TOP_GAINERS_COUNT = 8
 MIN_MARKET_CAP_USD = 20_000_000  # filters out illiquid/low-cap noise from top gainers
 
 _crypto_cache = {"data": None, "ts": 0}
-CRYPTO_CACHE_TTL = 300  # seconds
+CRYPTO_CACHE_TTL = 600  # seconds - crypto is a bonus feature; gold price reliability takes priority
 
 
 def fetch_main_coins_via_twelvedata():
-    # Per-symbol calls, each isolated - a single unsupported symbol (e.g. a newer coin
-    # Twelve Data doesn't cover) can't silently take down the other 8. Cached for 5 min,
-    # so 9 calls per cache refresh is trivial load on an authenticated API key.
+    # Per-symbol calls, each isolated - one bad/unsupported symbol can't silently take
+    # down the others. Cached for 10 min, and spaced slightly, so this burst of calls
+    # never competes hard with the gold price fetching that shares the same API key/quota.
+    import time as _time
     if not TWELVE_DATA_KEY:
         return []
     results = []
-    for td_symbol, label in TWELVE_DATA_CRYPTO_MAP.items():
+    for i, (td_symbol, label) in enumerate(TWELVE_DATA_CRYPTO_MAP.items()):
+        if i > 0:
+            _time.sleep(0.12)
         try:
             r = requests.get("https://api.twelvedata.com/quote",
                               params={"symbol": td_symbol, "apikey": TWELVE_DATA_KEY}, timeout=15)
