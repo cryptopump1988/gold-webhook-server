@@ -782,9 +782,14 @@ async function enablePush() {
     alert("Push notifications aren't supported in this browser.");
     return;
   }
+  if (Notification.permission === "denied") {
+    alert("Notifications were previously blocked for this site. Your browser won't ask again automatically.\n\nTo fix: tap the lock/info icon next to the address bar → Site settings → Notifications → set to Allow, then reload this page and tap the bell again.");
+    return;
+  }
   try {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
+      alert("Notification permission was not granted, so alerts can't be enabled right now.");
       updateNotifyBtn();
       return;
     }
@@ -806,7 +811,7 @@ async function enablePush() {
     updateNotifyBtn();
   } catch (e) {
     console.log("Push subscribe failed", e);
-    alert("Could not enable notifications. Please try again.");
+    alert("Could not enable notifications: " + (e && e.message ? e.message : e));
   }
   updateNotifyBtn();
   refreshSettingsPanel();
@@ -1026,6 +1031,39 @@ def icon192():
 @app.route("/icon512.png", methods=["GET"])
 def icon512():
     return Response(base64.b64decode(ICON_512_B64), mimetype="image/png")
+
+
+@app.route("/debug-github", methods=["GET"])
+def debug_github():
+    result = {
+        "github_token_present": bool(GITHUB_TOKEN),
+        "github_repo_value": GITHUB_REPO,
+    }
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        result["problem"] = "GITHUB_TOKEN or GITHUB_REPO is missing/empty on the server."
+        return Response(json.dumps(result, indent=2), mimetype="application/json")
+
+    url = "https://api.github.com/repos/" + GITHUB_REPO + "/contents/" + HISTORY_PATH
+    try:
+        r = requests.get(url, headers=gh_headers(), timeout=15)
+        result["get_status_code"] = r.status_code
+        if r.status_code == 200:
+            j = r.json()
+            result["file_found"] = True
+            result["sha"] = j.get("sha")
+            try:
+                content = base64.b64decode(j["content"]).decode("utf-8")
+                parsed = json.loads(content)
+                result["current_entry_count"] = len(parsed)
+            except Exception as e:
+                result["content_parse_error"] = str(e)
+        else:
+            result["file_found"] = False
+            result["github_api_response"] = r.text[:500]
+    except Exception as e:
+        result["request_exception"] = str(e)
+
+    return Response(json.dumps(result, indent=2), mimetype="application/json")
 
 
 @app.route("/ping", methods=["GET"])
