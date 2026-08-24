@@ -393,6 +393,29 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
   background:var(--card2); border:1px solid var(--border); border-radius:10px; width:38px; height:38px;
   font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
 }
+.ticker-strip {
+  overflow:hidden; background:var(--card2); border-bottom:1px solid var(--border);
+  white-space:nowrap; position:relative; padding:8px 0;
+}
+.ticker-track {
+  display:inline-flex; align-items:center; animation: ticker-scroll 55s linear infinite;
+}
+.ticker-strip:hover .ticker-track { animation-play-state: paused; }
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-item {
+  display:inline-flex; align-items:center; gap:6px; padding:0 18px; font-size:13px; flex-shrink:0;
+}
+.ticker-item .tsym { font-weight:700; color:var(--text); }
+.ticker-item .tprice { color:var(--text-dim); }
+.ticker-item .tchange.up { color:#26a69a; font-weight:600; }
+.ticker-item .tchange.down { color:#ef5350; font-weight:600; }
+.ticker-item .tgainer-tag {
+  font-size:10px; background:#f4c43022; color:#f4c430; border-radius:5px; padding:1px 5px; font-weight:700;
+}
+.ticker-loading { padding:0 18px; font-size:13px; color:var(--text-dim); }
 .chooser-overlay {
   display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:100;
   align-items:center; justify-content:center; padding:20px;
@@ -510,6 +533,12 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0114.6-3.4L21 8M20.5 15a9 9 0 01-14.6 3.4L3 16"/></svg>
       Refresh
     </button>
+  </div>
+</div>
+
+<div class="ticker-strip" id="tickerStrip">
+  <div class="ticker-track" id="tickerTrack">
+    <span class="ticker-loading">Loading market data…</span>
   </div>
 </div>
 
@@ -1001,9 +1030,34 @@ async function load(manual) {
   }
   if (manual) setTimeout(()=>btn.classList.remove("spinning"), 500);
 }
+
+async function loadTicker() {
+  try {
+    const res = await fetch("/crypto-ticker");
+    const data = await res.json();
+    const coins = data.coins || [];
+    if (coins.length === 0) return;
+    const itemHtml = (c) => {
+      const dir = c.change_pct >= 0 ? "up" : "down";
+      const arrow = c.change_pct >= 0 ? "▲" : "▼";
+      const priceStr = c.price >= 1 ? c.price.toLocaleString(undefined, {maximumFractionDigits: 2}) : c.price.toPrecision(4);
+      const tag = c.type === "gainer" ? '<span class="tgainer-tag">TOP GAINER</span>' : "";
+      const name = c.symbol.replace("USDT", "");
+      return `<span class="ticker-item">${tag}<span class="tsym">${name}</span><span class="tprice">$${priceStr}</span><span class="tchange ${dir}">${arrow} ${Math.abs(c.change_pct).toFixed(2)}%</span></span>`;
+    };
+    // Render the list twice back-to-back so the CSS animation (translateX -50%) loops seamlessly
+    const html = coins.map(itemHtml).join("") + coins.map(itemHtml).join("");
+    document.getElementById("tickerTrack").innerHTML = html;
+  } catch (e) {
+    // leave existing ticker content in place on a transient failure
+  }
+}
+
 load();
+loadTicker();
 loadWeekStats();
 setInterval(load, 20000);
+setInterval(loadTicker, 30000);
 document.getElementById("refreshBtn").addEventListener("click", loadWeekStats);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
@@ -1348,6 +1402,75 @@ def debug_github():
         result["request_exception"] = str(e)
 
     return Response(json.dumps(result, indent=2), mimetype="application/json")
+
+
+CRYPTO_TICKER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "SOLUSDT",
+                          "TRXUSDT", "HYPEUSDT", "DOGEUSDT", "ZECUSDT"]
+LEVERAGED_TOKEN_MARKERS = ["UPUSDT", "DOWNUSDT", "BULLUSDT", "BEARUSDT"]
+TOP_GAINERS_COUNT = 8
+MIN_QUOTE_VOLUME_USDT = 5_000_000  # filters out illiquid/low-volume noise from top gainers
+
+_crypto_cache = {"data": None, "ts": 0}
+CRYPTO_CACHE_TTL = 30  # seconds - avoid hammering Binance on every client poll
+
+
+@app.route("/crypto-ticker", methods=["GET"])
+def crypto_ticker():
+    import time as _time
+    now = _time.time()
+    if _crypto_cache["data"] is not None and (now - _crypto_cache["ts"]) < CRYPTO_CACHE_TTL:
+        return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
+
+    try:
+        r = requests.get("https://api.binance.com/api/v3/ticker/24hr", timeout=15)
+        r.raise_for_status()
+        all_tickers = r.json()
+    except Exception as e:
+        print("Crypto ticker bulk fetch failed:", e)
+        # serve stale cache if we have one, rather than a hard failure
+        if _crypto_cache["data"] is not None:
+            return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
+        return Response(json.dumps({"coins": []}), mimetype="application/json")
+
+    by_symbol = {}
+    for d in all_tickers:
+        sym = d.get("symbol", "")
+        if not sym.endswith("USDT"):
+            continue
+        if any(marker in sym for marker in LEVERAGED_TOKEN_MARKERS):
+            continue
+        try:
+            by_symbol[sym] = {
+                "symbol": sym,
+                "price": float(d["lastPrice"]),
+                "change_pct": float(d["priceChangePercent"]),
+                "quote_volume": float(d.get("quoteVolume", 0)),
+            }
+        except (KeyError, ValueError, TypeError):
+            continue
+
+    results = []
+    for sym in CRYPTO_TICKER_SYMBOLS:
+        if sym in by_symbol:
+            entry = dict(by_symbol[sym])
+            entry["type"] = "main"
+            results.append(entry)
+
+    main_symbols = set(CRYPTO_TICKER_SYMBOLS)
+    gainer_candidates = [
+        v for sym, v in by_symbol.items()
+        if sym not in main_symbols and v["quote_volume"] >= MIN_QUOTE_VOLUME_USDT and v["change_pct"] > 0
+    ]
+    gainer_candidates.sort(key=lambda v: v["change_pct"], reverse=True)
+    for entry in gainer_candidates[:TOP_GAINERS_COUNT]:
+        e = dict(entry)
+        e["type"] = "gainer"
+        results.append(e)
+
+    _crypto_cache["data"] = results
+    _crypto_cache["ts"] = now
+    return Response(json.dumps({"coins": results}), mimetype="application/json")
+
 
 
 @app.route("/ping", methods=["GET"])
