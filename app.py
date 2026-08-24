@@ -1653,30 +1653,26 @@ CRYPTO_CACHE_TTL = 300  # seconds
 
 
 def fetch_main_coins_via_twelvedata():
-    # Uses the same authenticated Twelve Data key already proven reliable for gold all session -
-    # avoids the shared free-tier IP rate-limiting that breaks public APIs like CoinGecko/Binance
-    # on Render's shared hosting. One batched call for all symbols, not one call per coin.
+    # Per-symbol calls, each isolated - a single unsupported symbol (e.g. a newer coin
+    # Twelve Data doesn't cover) can't silently take down the other 8. Cached for 5 min,
+    # so 9 calls per cache refresh is trivial load on an authenticated API key.
     if not TWELVE_DATA_KEY:
         return []
-    symbols = ",".join(TWELVE_DATA_CRYPTO_MAP.keys())
-    r = requests.get("https://api.twelvedata.com/quote", params={"symbol": symbols, "apikey": TWELVE_DATA_KEY}, timeout=20)
-    r.raise_for_status()
-    data = r.json()
-    # Twelve Data returns a single object (not keyed by symbol) when only one symbol resolves,
-    # and a dict-of-dicts keyed by symbol when multiple resolve - handle both shapes.
-    if "symbol" in data:
-        data = {data["symbol"]: data}
     results = []
     for td_symbol, label in TWELVE_DATA_CRYPTO_MAP.items():
-        d = data.get(td_symbol)
-        if not d or "close" not in d or "percent_change" not in d:
-            continue
         try:
+            r = requests.get("https://api.twelvedata.com/quote",
+                              params={"symbol": td_symbol, "apikey": TWELVE_DATA_KEY}, timeout=15)
+            d = r.json()
+            if "close" not in d or "percent_change" not in d:
+                print("Twelve Data crypto quote missing fields for", td_symbol, ":", d)
+                continue
             results.append({
                 "symbol": label, "price": float(d["close"]),
                 "change_pct": float(d["percent_change"]), "type": "main"
             })
-        except (TypeError, ValueError):
+        except Exception as e:
+            print("Twelve Data crypto quote failed for", td_symbol, ":", repr(e))
             continue
     return results
 
@@ -1694,8 +1690,12 @@ def debug_crypto():
     result = {}
     try:
         main_coins = fetch_main_coins_via_twelvedata()
-        result["twelvedata_main_coins_success"] = True
-        result["twelvedata_main_coins_count"] = len(main_coins)
+        result["twelvedata_main_coins_success"] = len(main_coins) > 0
+        result["twelvedata_coins_returned"] = [c["symbol"] for c in main_coins]
+        result["twelvedata_coins_missing"] = [
+            label for td_symbol, label in TWELVE_DATA_CRYPTO_MAP.items()
+            if label not in [c["symbol"] for c in main_coins]
+        ]
         result["twelvedata_sample"] = main_coins[0] if main_coins else None
     except Exception as e:
         result["twelvedata_main_coins_success"] = False
