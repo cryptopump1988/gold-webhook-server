@@ -1636,8 +1636,10 @@ def market_context():
     return Response(json.dumps(result), mimetype="application/json")
 
 
-CRYPTO_TICKER_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "SOLUSDT",
-                          "TRXUSDT", "HYPEUSDT", "DOGEUSDT", "ZECUSDT"]
+TWELVE_DATA_CRYPTO_MAP = {
+    "BTC/USD": "BTC", "ETH/USD": "ETH", "BNB/USD": "BNB", "XRP/USD": "XRP", "SOL/USD": "SOL",
+    "TRX/USD": "TRX", "HYPE/USD": "HYPE", "DOGE/USD": "DOGE", "ZEC/USD": "ZEC",
+}
 COINGECKO_ID_MAP = {
     "BTCUSDT": ("bitcoin", "BTC"), "ETHUSDT": ("ethereum", "ETH"), "BNBUSDT": ("binancecoin", "BNB"),
     "XRPUSDT": ("ripple", "XRP"), "SOLUSDT": ("solana", "SOL"), "TRXUSDT": ("tron", "TRX"),
@@ -1647,7 +1649,36 @@ TOP_GAINERS_COUNT = 8
 MIN_MARKET_CAP_USD = 20_000_000  # filters out illiquid/low-cap noise from top gainers
 
 _crypto_cache = {"data": None, "ts": 0}
-CRYPTO_CACHE_TTL = 300  # seconds - a shared free-tier IP hits CoinGecko's rate limit fast, so cache generously
+CRYPTO_CACHE_TTL = 300  # seconds
+
+
+def fetch_main_coins_via_twelvedata():
+    # Uses the same authenticated Twelve Data key already proven reliable for gold all session -
+    # avoids the shared free-tier IP rate-limiting that breaks public APIs like CoinGecko/Binance
+    # on Render's shared hosting. One batched call for all symbols, not one call per coin.
+    if not TWELVE_DATA_KEY:
+        return []
+    symbols = ",".join(TWELVE_DATA_CRYPTO_MAP.keys())
+    r = requests.get("https://api.twelvedata.com/quote", params={"symbol": symbols, "apikey": TWELVE_DATA_KEY}, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    # Twelve Data returns a single object (not keyed by symbol) when only one symbol resolves,
+    # and a dict-of-dicts keyed by symbol when multiple resolve - handle both shapes.
+    if "symbol" in data:
+        data = {data["symbol"]: data}
+    results = []
+    for td_symbol, label in TWELVE_DATA_CRYPTO_MAP.items():
+        d = data.get(td_symbol)
+        if not d or "close" not in d or "percent_change" not in d:
+            continue
+        try:
+            results.append({
+                "symbol": label, "price": float(d["close"]),
+                "change_pct": float(d["percent_change"]), "type": "main"
+            })
+        except (TypeError, ValueError):
+            continue
+    return results
 
 
 def _fetch_coingecko_markets(**params):
@@ -1662,14 +1693,20 @@ def _fetch_coingecko_markets(**params):
 def debug_crypto():
     result = {}
     try:
-        main_ids = ",".join(v[0] for v in COINGECKO_ID_MAP.values())
-        data = _fetch_coingecko_markets(ids=main_ids, per_page=50)
-        result["main_coins_fetch_success"] = True
-        result["main_coins_count"] = len(data)
-        result["sample"] = data[0] if data else None
+        main_coins = fetch_main_coins_via_twelvedata()
+        result["twelvedata_main_coins_success"] = True
+        result["twelvedata_main_coins_count"] = len(main_coins)
+        result["twelvedata_sample"] = main_coins[0] if main_coins else None
     except Exception as e:
-        result["main_coins_fetch_success"] = False
-        result["error"] = repr(e)
+        result["twelvedata_main_coins_success"] = False
+        result["twelvedata_error"] = repr(e)
+    try:
+        top_data = _fetch_coingecko_markets(order="market_cap_desc", per_page=10, page=1)
+        result["coingecko_gainers_success"] = True
+        result["coingecko_sample_count"] = len(top_data)
+    except Exception as e:
+        result["coingecko_gainers_success"] = False
+        result["coingecko_error"] = repr(e)
     return Response(json.dumps(result, indent=2, default=str), mimetype="application/json")
 
 
@@ -1680,23 +1717,14 @@ def crypto_ticker():
     if _crypto_cache["data"] is not None and (now - _crypto_cache["ts"]) < CRYPTO_CACHE_TTL:
         return Response(json.dumps({"coins": _crypto_cache["data"]}), mimetype="application/json")
 
+    results = []
     try:
-        # Single combined call instead of two - halves the rate-limit pressure on
-        # CoinGecko's shared-IP free tier. Top 250 by market cap covers both our
-        # main coins (all well within top 250) and the gainers pool.
+        results.extend(fetch_main_coins_via_twelvedata())
+    except Exception as e:
+        print("Crypto ticker main-coins (Twelve Data) fetch failed:", repr(e))
+
+    try:
         top_data = _fetch_coingecko_markets(order="market_cap_desc", per_page=250, page=1)
-        by_id = {d["id"]: d for d in top_data}
-
-        results = []
-        for sym, (gecko_id, label) in COINGECKO_ID_MAP.items():
-            d = by_id.get(gecko_id)
-            if not d or d.get("current_price") is None or d.get("price_change_percentage_24h") is None:
-                continue
-            results.append({
-                "symbol": label, "price": float(d["current_price"]),
-                "change_pct": float(d["price_change_percentage_24h"]), "type": "main"
-            })
-
         main_gecko_ids = set(v[0] for v in COINGECKO_ID_MAP.values())
         gainer_candidates = [
             d for d in top_data
@@ -1711,13 +1739,14 @@ def crypto_ticker():
                 "symbol": d["symbol"].upper(), "price": float(d["current_price"]),
                 "change_pct": float(d["price_change_percentage_24h"]), "type": "gainer"
             })
-
-        if results:
-            _crypto_cache["data"] = results
-            _crypto_cache["ts"] = now
-            return Response(json.dumps({"coins": results}), mimetype="application/json")
     except Exception as e:
-        print("Crypto ticker fetch failed:", repr(e))
+        # Gainers are a bonus feature - main coins (Twelve Data) still work even if this fails
+        print("Crypto ticker gainers (CoinGecko) fetch failed:", repr(e))
+
+    if results:
+        _crypto_cache["data"] = results
+        _crypto_cache["ts"] = now
+        return Response(json.dumps({"coins": results}), mimetype="application/json")
 
     # Any failure (rate limit, network issue, etc.) - serve the last successful
     # result regardless of how stale it is, rather than showing nothing.
