@@ -80,6 +80,23 @@ def fetch_closes(symbol="XAU/USD", interval="15min", outputsize=200):
     return closes
 
 
+def fetch_ohlc(symbol="XAU/USD", interval="15min", outputsize=700):
+    import time as _time
+    url = "https://api.twelvedata.com/time_series"
+    params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": TWELVE_DATA_KEY, "format": "JSON"}
+    r = requests.get(url, params=params, timeout=25)
+    data = r.json()
+    if "values" not in data:
+        print("Twelve Data error:", data)
+        return None
+    values = list(reversed(data["values"]))
+    bars = []
+    for v in values:
+        t = int(_time.mktime(_time.strptime(v["datetime"], "%Y-%m-%d %H:%M:%S")))
+        bars.append({"time": t, "open": float(v["open"]), "high": float(v["high"]), "low": float(v["low"]), "close": float(v["close"])})
+    return bars
+
+
 def build_chart_url(closes, entry, sl, tp1, tp2, tp3, signal):
     n = len(closes)
     labels = [str(i) for i in range(n)]
@@ -125,6 +142,73 @@ def build_caption(symbol, signal, kind, entry, sl, tp1, tp2, tp3):
     return caption
 
 
+def compute_outcome(sig, bars):
+    # Returns "SL", "TP", or "OPEN" based on which level price reaches first
+    # after the signal's own timestamp, walking the candle history chronologically.
+    # If a single bar's range touches both SL and a TP, SL is assumed first (conservative).
+    if "time_unix" not in sig:
+        return None
+    try:
+        entry_t = int(sig["time_unix"])
+        sl_v = float(sig["sl"])
+        tp1_v = float(sig["tp1"])
+        direction = sig["signal"]
+    except Exception:
+        return None
+    relevant = [b for b in bars if b["time"] >= entry_t]
+    for b in relevant:
+        if direction == "BUY":
+            hit_sl = b["low"] <= sl_v
+            hit_tp = b["high"] >= tp1_v
+        else:
+            hit_sl = b["high"] >= sl_v
+            hit_tp = b["low"] <= tp1_v
+        if hit_sl:
+            return "SL"
+        if hit_tp:
+            return "TP"
+    return "OPEN"
+
+
+_stats_cache = {"data": None, "ts": 0}
+STATS_CACHE_TTL = 300  # seconds
+
+
+def get_7day_stats():
+    import time as _time
+    now = _time.time()
+    if _stats_cache["data"] is not None and (now - _stats_cache["ts"]) < STATS_CACHE_TTL:
+        return _stats_cache["data"]
+
+    history, _ = gh_load_history()
+    cutoff = now - 7 * 24 * 3600
+    week_signals = [s for s in history if s.get("kind") == "signal" and s.get("time_unix", 0) >= cutoff]
+
+    result = {"total": len(week_signals), "sl_hit": 0, "tp_hit": 0, "open": 0, "untracked": 0}
+
+    if week_signals and TWELVE_DATA_KEY:
+        bars = fetch_ohlc(outputsize=700)
+        if bars:
+            for s in week_signals:
+                outcome = compute_outcome(s, bars)
+                if outcome == "SL":
+                    result["sl_hit"] += 1
+                elif outcome == "TP":
+                    result["tp_hit"] += 1
+                elif outcome == "OPEN":
+                    result["open"] += 1
+                else:
+                    result["untracked"] += 1
+        else:
+            result["untracked"] = len(week_signals)
+    else:
+        result["untracked"] = len(week_signals)
+
+    _stats_cache["data"] = result
+    _stats_cache["ts"] = now
+    return result
+
+
 @app.route("/", methods=["GET"])
 def home():
     html = r"""<!DOCTYPE html>
@@ -132,7 +216,7 @@ def home():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Gold Signals</title>
+<title>Bakale's Trading</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon192.png">
 <link rel="apple-touch-icon" href="/icon192.png">
@@ -190,6 +274,18 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
 @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
 
 .stats-strip { display:flex; gap:10px; padding:14px 16px 4px; overflow-x:auto; }
+.week-panel {
+  margin:14px 16px 0; background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:16px; box-shadow: var(--shadow);
+}
+.week-panel h2 { font-size:14px; margin:0 0 12px; font-weight:700; display:flex; align-items:center; gap:6px; }
+.week-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+.week-cell { text-align:center; padding:10px 4px; border-radius:10px; background:var(--card2); }
+.week-cell .num { font-size:19px; font-weight:800; }
+.week-cell .lbl { font-size:10.5px; color:var(--muted); margin-top:3px; }
+.week-cell.sl .num { color:var(--sell); }
+.week-cell.tp .num { color:var(--buy); }
+.week-note { font-size:11px; color:var(--muted); margin-top:10px; text-align:center; }
 .stat-pill {
   background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 16px;
   min-width:84px; text-align:center; flex-shrink:0; box-shadow: var(--shadow);
@@ -248,7 +344,7 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
   <div class="brand">
     <div class="logo">G</div>
     <div>
-      <h1>Gold Signals</h1>
+      <h1>Bakale's Trading</h1>
       <div class="sub">CHoCH Live Feed</div>
     </div>
   </div>
@@ -266,6 +362,17 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
     <h2><span class="live-dot"></span>XAUUSD Live Chart</h2>
   </div>
   <div id="tvChartContainer"></div>
+</div>
+
+<div class="week-panel" id="weekPanel">
+  <h2>\ud83d\udcc5 Last 7 Days</h2>
+  <div class="week-grid" id="weekGrid">
+    <div class="week-cell"><div class="num">\u2026</div><div class="lbl">Trades</div></div>
+    <div class="week-cell sl"><div class="num">\u2026</div><div class="lbl">Hit SL</div></div>
+    <div class="week-cell tp"><div class="num">\u2026</div><div class="lbl">Hit TP</div></div>
+    <div class="week-cell"><div class="num">\u2026</div><div class="lbl">Still Open</div></div>
+  </div>
+  <div class="week-note" id="weekNote"></div>
 </div>
 
 <div class="stats-strip" id="statsStrip"></div>
@@ -385,6 +492,23 @@ function renderCards() {
   el.innerHTML = html;
 }
 
+async function loadWeekStats() {
+  try {
+    const res = await fetch("/stats7d");
+    const s = await res.json();
+    const grid = document.getElementById("weekGrid");
+    const cells = grid.querySelectorAll(".week-cell .num");
+    cells[0].textContent = s.total;
+    cells[1].textContent = s.sl_hit;
+    cells[2].textContent = s.tp_hit;
+    cells[3].textContent = s.open;
+    const note = document.getElementById("weekNote");
+    note.textContent = s.untracked > 0 ? `${s.untracked} trade(s) not counted (no price history available)` : "";
+  } catch (e) {
+    document.getElementById("weekNote").textContent = "Could not load weekly results.";
+  }
+}
+
 async function load(manual) {
   const btn = document.getElementById("refreshBtn");
   if (manual) btn.classList.add("spinning");
@@ -401,7 +525,9 @@ async function load(manual) {
   if (manual) setTimeout(()=>btn.classList.remove("spinning"), 500);
 }
 load();
+loadWeekStats();
 setInterval(load, 20000);
+document.getElementById("refreshBtn").addEventListener("click", loadWeekStats);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
@@ -414,8 +540,8 @@ if ("serviceWorker" in navigator) {
 @app.route("/manifest.json", methods=["GET"])
 def manifest():
     m = {
-        "name": "Gold CHoCH Signals",
-        "short_name": "Gold Signals",
+        "name": "Bakale's Trading",
+        "short_name": "Bakale's Trading",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#0d1117",
@@ -442,6 +568,11 @@ def icon192():
 @app.route("/icon512.png", methods=["GET"])
 def icon512():
     return Response(base64.b64decode(ICON_512_B64), mimetype="image/png")
+
+
+@app.route("/stats7d", methods=["GET"])
+def stats7d():
+    return Response(json.dumps(get_7day_stats()), mimetype="application/json")
 
 
 @app.route("/latest", methods=["GET"])
@@ -500,7 +631,8 @@ def webhook():
         "symbol": symbol, "signal": signal, "kind": kind,
         "entry": entry, "sl": sl, "tp1": tp1, "tp2": tp2, "tp3": tp3,
         "chart_url": chart_url_for_app,
-        "time": datetime.utcnow().strftime("%d %b %Y, %H:%M UTC")
+        "time": datetime.utcnow().strftime("%d %b %Y, %H:%M UTC"),
+        "time_unix": int(datetime.utcnow().timestamp())
     }
 
     try:
