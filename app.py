@@ -133,15 +133,25 @@ def send_push_to_all(title, body_text, url_path="/"):
 
 
 def fetch_closes(symbol="XAU/USD", interval="15min", outputsize=200):
+    if not TWELVE_DATA_KEY:
+        return None
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": TWELVE_DATA_KEY, "format": "JSON"}
-    r = requests.get(url, params=params, timeout=20)
-    data = r.json()
+    try:
+        r = requests.get(url, params=params, timeout=20)
+        data = r.json()
+    except Exception as e:
+        print("Twelve Data request failed (fetch_closes):", e)
+        return None
     if "values" not in data:
         print("Twelve Data error:", data)
         return None
     values = list(reversed(data["values"]))
-    closes = [float(v["close"]) for v in values]
+    try:
+        closes = [float(v["close"]) for v in values]
+    except Exception as e:
+        print("Failed parsing closes:", e)
+        return None
     return closes
 
 
@@ -193,7 +203,7 @@ def fetch_ohlc(symbol="XAU/USD", interval="15min", outputsize=700):
     return bars
 
 
-def build_chart_url(closes, entry, sl, tp1, tp2, tp3, signal):
+def build_chart_config(closes, entry, sl, tp1, tp2, tp3, signal):
     n = len(closes)
     labels = [str(i) for i in range(n)]
     flat_entry = [entry] * n
@@ -202,7 +212,7 @@ def build_chart_url(closes, entry, sl, tp1, tp2, tp3, signal):
     flat_tp2 = [tp2] * n
     flat_tp3 = [tp3] * n
 
-    config = {
+    return {
         "type": "line",
         "data": {
             "labels": labels,
@@ -225,10 +235,21 @@ def build_chart_url(closes, entry, sl, tp1, tp2, tp3, signal):
         }
     }
 
-    params = {"c": json.dumps(config), "width": 900, "height": 500, "backgroundColor": "#131722", "devicePixelRatio": 2}
-    req = requests.Request("GET", "https://quickchart.io/chart", params=params)
-    prepared = req.prepare()
-    return prepared.url
+
+def render_chart_png_bytes(config):
+    """POST to QuickChart instead of a giant GET URL - avoids the ~19,000+ character
+    URL that a 200-point, 6-line chart produces, which was silently rejected before."""
+    body = {"chart": config, "width": 900, "height": 500, "backgroundColor": "#131722",
+             "devicePixelRatio": 2, "format": "png"}
+    r = requests.post("https://quickchart.io/chart", json=body, timeout=25)
+    r.raise_for_status()
+    return r.content
+
+
+def send_photo_bytes(photo_bytes, caption):
+    files = {"photo": ("setup.png", photo_bytes)}
+    data = {"chat_id": CHAT_ID, "caption": caption, "parse_mode": "HTML"}
+    return requests.post(TELEGRAM_SEND_PHOTO_URL, data=data, files=files, timeout=25)
 
 
 def build_caption(symbol, signal, kind, entry, sl, tp1, tp2, tp3):
@@ -1351,6 +1372,51 @@ def subscribe():
     return "OK", 200
 
 
+@app.route("/debug-chart", methods=["GET"])
+def debug_chart():
+    result = {"twelve_data_key_present": bool(TWELVE_DATA_KEY)}
+    if not TWELVE_DATA_KEY:
+        result["problem"] = "TWELVE_DATA_KEY missing on the server."
+        return Response(json.dumps(result, indent=2), mimetype="application/json")
+    try:
+        closes = fetch_closes()
+        result["closes_fetched"] = len(closes) if closes else 0
+        if not closes or len(closes) <= 10:
+            result["problem"] = "Not enough price data returned from Twelve Data"
+            return Response(json.dumps(result, indent=2), mimetype="application/json")
+        config = build_chart_config(closes, 4655.07, 4681.79, 4626.35, 4601.64, 4574.92, "SELL")
+        png_bytes = render_chart_png_bytes(config)
+        result["chart_render_success"] = True
+        result["chart_bytes"] = len(png_bytes)
+    except Exception as e:
+        result["chart_render_success"] = False
+        result["error"] = repr(e)
+    return Response(json.dumps(result, indent=2), mimetype="application/json")
+
+
+@app.route("/chart-image", methods=["GET"])
+def chart_image():
+    try:
+        entry = float(request.args.get("entry"))
+        sl = float(request.args.get("sl"))
+        tp1 = float(request.args.get("tp1"))
+        tp2 = float(request.args.get("tp2", tp1))
+        tp3 = float(request.args.get("tp3", tp1))
+        signal = request.args.get("signal", "BUY")
+    except (TypeError, ValueError):
+        return "Bad or missing parameters", 400
+
+    closes = fetch_closes()
+    if not closes or len(closes) <= 10:
+        return "Could not fetch price data", 502
+    try:
+        config = build_chart_config(closes, entry, sl, tp1, tp2, tp3, signal)
+        png_bytes = render_chart_png_bytes(config)
+    except Exception as e:
+        return "Chart render failed: " + str(e), 502
+    return Response(png_bytes, mimetype="image/png")
+
+
 @app.route("/candles", methods=["GET"])
 def candles():
     bars = fetch_ohlc(outputsize=300)
@@ -1407,11 +1473,16 @@ def webhook():
         try:
             closes = fetch_closes()
             if closes and len(closes) > 10:
-                chart_url_for_app = build_chart_url(closes, float(entry), float(sl), float(tp1), float(tp2), float(tp3), signal)
-                r = send_photo_from_url(chart_url_for_app, caption)
+                config = build_chart_config(closes, float(entry), float(sl), float(tp1), float(tp2), float(tp3), signal)
+                png_bytes = render_chart_png_bytes(config)
+                r = send_photo_bytes(png_bytes, caption)
                 chart_sent = r.status_code == 200
+                if not chart_sent:
+                    print("Telegram photo send failed:", r.status_code, r.text[:300])
+                chart_url_for_app = ("/chart-image?signal=" + signal + "&entry=" + str(entry) +
+                                      "&sl=" + str(sl) + "&tp1=" + str(tp1) + "&tp2=" + str(tp2) + "&tp3=" + str(tp3))
         except Exception as e:
-            print("Chart generation failed:", e)
+            print("Chart generation/send failed:", repr(e))
 
     if not chart_sent:
         send_text(caption)
