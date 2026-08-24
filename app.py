@@ -161,13 +161,35 @@ def fetch_ohlc(symbol="XAU/USD", interval="15min", outputsize=700):
         print("Twelve Data error:", data)
         return None
     values = list(reversed(data["values"]))
-    bars = []
+    raw_bars = []
     for v in values:
         try:
             t = int(_time.mktime(_time.strptime(v["datetime"], "%Y-%m-%d %H:%M:%S")))
-            bars.append({"time": t, "open": float(v["open"]), "high": float(v["high"]), "low": float(v["low"]), "close": float(v["close"])})
+            raw_bars.append({"time": t, "open": float(v["open"]), "high": float(v["high"]), "low": float(v["low"]), "close": float(v["close"])})
         except Exception:
             continue
+
+    # Drop stale/placeholder bars from closed-market periods (e.g. weekends):
+    # a real trading bar for gold almost always has some intrabar range.
+    # Only strip RUNS of 3+ consecutive zero-range bars with the same close,
+    # so genuine brief quiet moments in live trading are kept.
+    bars = []
+    i = 0
+    n = len(raw_bars)
+    while i < n:
+        b = raw_bars[i]
+        is_flat = b["open"] == b["high"] == b["low"] == b["close"]
+        if is_flat:
+            j = i
+            while j < n and raw_bars[j]["open"] == raw_bars[j]["high"] == raw_bars[j]["low"] == raw_bars[j]["close"] == b["close"]:
+                j += 1
+            run_len = j - i
+            if run_len >= 3:
+                i = j
+                continue
+        bars.append(b)
+        i += 1
+
     return bars
 
 
@@ -1031,6 +1053,111 @@ def icon192():
 @app.route("/icon512.png", methods=["GET"])
 def icon512():
     return Response(base64.b64decode(ICON_512_B64), mimetype="image/png")
+
+
+@app.route("/add", methods=["GET"])
+def add_form():
+    html = r"""<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add Past Setup</title>
+<style>
+body { background:#0f1115; color:#eee; font-family:-apple-system,sans-serif; padding:20px; }
+h2 { margin-top:0; }
+label { display:block; margin-top:14px; font-size:14px; color:#aaa; }
+input, select { width:100%; box-sizing:border-box; padding:10px; margin-top:4px; border-radius:8px; border:1px solid #333; background:#1a1d24; color:#fff; font-size:16px; }
+button { margin-top:20px; width:100%; padding:14px; border:none; border-radius:10px; background:#f4c430; color:#000; font-weight:700; font-size:16px; }
+.msg { margin-top:14px; padding:10px; border-radius:8px; }
+.ok { background:#1a3a1a; color:#8f8; }
+.err { background:#3a1a1a; color:#f88; }
+</style></head>
+<body>
+<h2>Add a Past Setup</h2>
+<p style="color:#888;font-size:13px">Enter values exactly as shown on your TradingView chart/log for a setup that already fired.</p>
+<form id="f">
+  <label>Symbol</label>
+  <input name="symbol" value="XAUUSD" required>
+  <label>Signal</label>
+  <select name="signal"><option>BUY</option><option>SELL</option></select>
+  <label>Entry</label>
+  <input name="entry" type="number" step="any" required>
+  <label>Stop Loss</label>
+  <input name="sl" type="number" step="any" required>
+  <label>TP1</label>
+  <input name="tp1" type="number" step="any" required>
+  <label>TP2</label>
+  <input name="tp2" type="number" step="any">
+  <label>TP3</label>
+  <input name="tp3" type="number" step="any">
+  <label>Date &amp; Time it fired</label>
+  <input name="datetime" type="datetime-local" required>
+  <button type="submit">Add Setup</button>
+</form>
+<div id="result"></div>
+<script>
+document.getElementById("f").addEventListener("submit", async function(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = Object.fromEntries(fd.entries());
+  const res = document.getElementById("result");
+  res.innerHTML = "";
+  try {
+    const r = await fetch("/add-manual-signal", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (r.ok) {
+      res.innerHTML = '<div class="msg ok">Added. <a href="/" style="color:#8f8">Go to app</a> or add another below.</div>';
+      e.target.reset();
+      document.querySelector('input[name="symbol"]').value = "XAUUSD";
+    } else {
+      res.innerHTML = '<div class="msg err">' + (j.error || "Failed to add") + '</div>';
+    }
+  } catch (err) {
+    res.innerHTML = '<div class="msg err">Network error: ' + err + '</div>';
+  }
+});
+</script>
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
+
+@app.route("/add-manual-signal", methods=["POST"])
+def add_manual_signal():
+    data = request.get_json(silent=True)
+    if not data:
+        return json.dumps({"error": "No data received"}), 400
+    required = ["symbol", "signal", "entry", "sl", "tp1", "datetime"]
+    for f in required:
+        if not data.get(f):
+            return json.dumps({"error": "Missing field: " + f}), 400
+    try:
+        import time as _time
+        dt = datetime.strptime(data["datetime"], "%Y-%m-%dT%H:%M")
+        time_unix = int(dt.timestamp())
+        time_str = dt.strftime("%d %b %Y, %H:%M")
+    except Exception as e:
+        return json.dumps({"error": "Bad date/time: " + str(e)}), 400
+
+    new_entry = {
+        "symbol": data["symbol"], "signal": data["signal"], "kind": "signal",
+        "entry": str(data["entry"]), "sl": str(data["sl"]),
+        "tp1": str(data["tp1"]), "tp2": str(data.get("tp2") or ""), "tp3": str(data.get("tp3") or ""),
+        "chart_url": "", "time": time_str, "time_unix": time_unix
+    }
+    try:
+        history, sha = gh_load_history()
+        history.insert(0, new_entry)
+        history.sort(key=lambda x: x.get("time_unix", 0), reverse=True)
+        history = history[:MAX_HISTORY]
+        ok = gh_save_history(history, sha)
+        if not ok:
+            return json.dumps({"error": "GitHub save failed - check /debug-github"}), 500
+    except Exception as e:
+        return json.dumps({"error": "Save error: " + str(e)}), 500
+
+    return json.dumps({"success": True}), 200
 
 
 @app.route("/debug-github", methods=["GET"])
