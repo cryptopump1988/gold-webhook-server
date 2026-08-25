@@ -395,31 +395,26 @@ body {
   position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center;
   backdrop-filter: blur(10px); transition: background 0.35s ease, border-color 0.35s ease;
 }
-.brand { display:flex; align-items:center; gap:10px; }
+.brand { display:flex; align-items:center; gap:8px; }
 .brand .logo {
-  width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#f2c94c,#b8860b);
-  display:flex; align-items:center; justify-content:center; font-weight:800; color:#161b22; font-size:16px;
+  width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#f2c94c,#b8860b);
+  display:flex; align-items:center; justify-content:center; font-weight:800; color:#161b22; font-size:13px;
 }
-.brand h1 { font-size:16px; margin:0; font-weight:700; letter-spacing:0.2px; }
+.brand h1 { font-size:14px; margin:0; font-weight:700; letter-spacing:0.2px; }
 .brand .sub { font-size:11px; color:var(--muted); margin-top:1px; }
-.header-actions { display:flex; align-items:center; gap:10px; }
+.header-actions { display:flex; align-items:center; gap:6px; }
 .theme-toggle {
-  width:44px; height:26px; border-radius:20px; background:var(--card2); border:1px solid var(--border);
+  width:36px; height:21px; border-radius:20px; background:var(--card2); border:1px solid var(--border);
   position:relative; cursor:pointer; transition:background 0.3s;
 }
 .theme-toggle .knob {
-  position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
-  background:var(--accent); transition: transform 0.3s ease; display:flex; align-items:center; justify-content:center; font-size:11px;
+  position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%;
+  background:var(--accent); transition: transform 0.3s ease; display:flex; align-items:center; justify-content:center; font-size:9px;
 }
-html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
-.refresh-btn {
-  background:linear-gradient(135deg,#2ea043,#238636); color:white; border:none; border-radius:10px;
-  padding:9px 14px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;
-  box-shadow: 0 3px 10px rgba(46,160,67,0.3); transition: transform 0.15s;
-}
+html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 .switch-btn {
-  background:var(--card2); border:1px solid var(--border); border-radius:10px; width:38px; height:38px;
-  font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  background:var(--card2); border:1px solid var(--border); border-radius:9px; width:29px; height:29px;
+  font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center;
 }
 .ticker-strip {
   overflow:hidden; background:var(--card2); border-bottom:1px solid var(--border);
@@ -569,7 +564,6 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
     <div class="logo">G</div>
     <div>
       <h1>Bakale's Trading</h1>
-      <div class="sub">CHoCH Live Feed</div>
     </div>
   </div>
   <div class="header-actions">
@@ -577,10 +571,6 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(18px); }
     <button class="switch-btn" id="switchBtn" onclick="openChooser()">📊</button>
     <button class="switch-btn" id="notifyBtn" onclick="enablePush()">🔔</button>
     <button class="switch-btn" id="settingsBtn" onclick="openSettings()">⚙️</button>
-    <button class="refresh-btn" id="refreshBtn" onclick="load(true)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M21 2v6h-6M3 22v-6h6M3.5 9a9 9 0 0114.6-3.4L21 8M20.5 15a9 9 0 01-14.6 3.4L3 16"/></svg>
-      Refresh
-    </button>
   </div>
 </div>
 
@@ -1066,8 +1056,6 @@ function playAlertSound() {
 }
 
 async function load(manual) {
-  const btn = document.getElementById("refreshBtn");
-  if (manual) btn.classList.add("spinning");
   try {
     const res = await fetch("/latest");
     const data = await res.json();
@@ -1083,9 +1071,8 @@ async function load(manual) {
     renderFilters();
     renderCards();
   } catch (e) {
-    document.getElementById("content").innerHTML = '<div class="empty"><div class="emoji">\u26a0\ufe0f</div>Could not load signals. Tap Refresh to try again.</div>';
+    document.getElementById("content").innerHTML = '<div class="empty"><div class="emoji">\u26a0\ufe0f</div>Could not load signals. It will retry automatically.</div>';
   }
-  if (manual) setTimeout(()=>btn.classList.remove("spinning"), 500);
 }
 
 async function loadTicker() {
@@ -1163,7 +1150,6 @@ loadMarketContext();
 setInterval(load, 20000);
 setInterval(loadTicker, 120000);
 setInterval(loadMarketContext, 60000);
-document.getElementById("refreshBtn").addEventListener("click", loadWeekStats);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
