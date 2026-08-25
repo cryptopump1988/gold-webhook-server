@@ -513,7 +513,8 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
   margin:14px 16px 4px; background:var(--card); border:1px solid var(--border); border-radius:16px;
   overflow:hidden; box-shadow: var(--shadow);
 }
-.chart-embed-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
+.chart-embed-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px; }
+.tv-note { padding:8px 16px; font-size:11px; line-height:1.4; color:var(--muted); border-bottom:1px solid var(--border); }
 .chart-embed-header h2 { font-size:14px; margin:0; font-weight:700; }
 .chart-embed-header .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--buy); margin-right:6px; animation: pulse 1.5s infinite; }
 .symbol-select {
@@ -645,7 +646,18 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
       <option value="FOREXCOM:USDCAD">USD/CAD</option>
       <option value="FOREXCOM:NZDUSD">NZD/USD</option>
     </select>
+    <select id="tvIntervalSelect" class="symbol-select" onchange="changeTVInterval(this.value)">
+      <option value="1">1m</option>
+      <option value="5">5m</option>
+      <option value="15">15m</option>
+      <option value="60">60m</option>
+      <option value="240">4H</option>
+      <option value="D">1D</option>
+      <option value="W">1W</option>
+    </select>
+    <button class="switch-btn" id="openTVBtn" onclick="openInTradingView()" title="Open this chart on TradingView to add your indicator">↗ Open in TradingView</button>
   </div>
+  <div class="tv-note">Add your CHoCH indicator on TradingView directly: tap "Open in TradingView" above, then Indicators → My Scripts → your script. This can't be automated from here — TradingView doesn't allow outside apps to add indicators to a chart, even public/published ones.</div>
   <div id="tvChartContainer"></div>
 </div>
 
@@ -699,6 +711,7 @@ function toggleTheme() {
 
 let tvScriptLoaded = false;
 let currentTVSymbol = localStorage.getItem("tvSymbol") || "FOREXCOM:XAUUSD";
+let currentTVInterval = localStorage.getItem("tvInterval") || "15";
 
 function changeTVSymbol(symbol) {
   currentTVSymbol = symbol;
@@ -709,6 +722,23 @@ function changeTVSymbol(symbol) {
   initTVWidget(theme);
 }
 
+function changeTVInterval(interval) {
+  currentTVInterval = interval;
+  localStorage.setItem("tvInterval", interval);
+  const theme = document.documentElement.getAttribute("data-theme") || "dark";
+  initTVWidget(theme);
+}
+
+function openInTradingView() {
+  // Deep-link to TradingView with symbol + interval pre-loaded.
+  // NOTE: TradingView does not allow any outside app to auto-apply an
+  // indicator to the chart -- you still add it manually once there via
+  // Indicators -> My Scripts. This is a TradingView platform limit, not
+  // something this app can bypass, even for public/published scripts.
+  const url = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(currentTVSymbol) + "&interval=" + encodeURIComponent(currentTVInterval);
+  window.open(url, "_blank");
+}
+
 function initTVWidget(theme) {
   const container = document.getElementById("tvChartContainer");
   container.innerHTML = "";
@@ -716,7 +746,7 @@ function initTVWidget(theme) {
     new TradingView.widget({
       "autosize": true,
       "symbol": currentTVSymbol,
-      "interval": "15",
+      "interval": currentTVInterval,
       "timezone": "Etc/UTC",
       "theme": theme === "light" ? "light" : "dark",
       "style": "1",
@@ -783,6 +813,7 @@ function selectChart(which) {
     document.getElementById("tvCard").style.display = "";
     document.getElementById("setupsCard").style.display = "none";
     document.getElementById("tvSymbolSelect").value = currentTVSymbol;
+    document.getElementById("tvIntervalSelect").value = currentTVInterval;
     const label = currentTVSymbol.replace("FOREXCOM:", "");
     document.getElementById("tvChartTitle").textContent = label === "XAUUSD" ? "XAUUSD" : label.slice(0,3) + "/" + label.slice(3);
     initTVWidget(document.documentElement.getAttribute("data-theme") || "dark");
