@@ -325,6 +325,12 @@ def get_7day_stats():
 
     if week_signals and TWELVE_DATA_KEY:
         bars = fetch_ohlc(outputsize=700)
+        if not bars:
+            # Full 7-day window failed - likely a Twelve Data quota/credit ceiling tied
+            # to request size (Market Context's smaller 300-bar request keeps working).
+            # Fall back to a smaller, cheaper request rather than showing nothing.
+            print("7-day stats: 700-bar fetch failed, falling back to 300-bar request")
+            bars = fetch_ohlc(outputsize=300)
         if bars:
             for s in week_signals:
                 r = compute_outcome_and_excursion(s, bars)
