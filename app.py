@@ -516,6 +516,10 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 .chart-embed-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
 .chart-embed-header h2 { font-size:14px; margin:0; font-weight:700; }
 .chart-embed-header .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--buy); margin-right:6px; animation: pulse 1.5s infinite; }
+.symbol-select {
+  background:var(--card2); color:var(--text); border:1px solid var(--border); border-radius:8px;
+  padding:5px 8px; font-size:12px; font-weight:600; cursor:pointer;
+}
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 #tvChartContainer { height:340px; }
 .card-link { text-decoration:none; color:inherit; display:block; }
@@ -630,7 +634,17 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 
 <div class="chart-embed-card" id="tvCard">
   <div class="chart-embed-header">
-    <h2><span class="live-dot"></span>XAUUSD Live Chart</h2>
+    <h2><span class="live-dot"></span><span id="tvChartTitle">XAUUSD</span> Live Chart</h2>
+    <select id="tvSymbolSelect" class="symbol-select" onchange="changeTVSymbol(this.value)">
+      <option value="FOREXCOM:XAUUSD">XAUUSD (Gold)</option>
+      <option value="FOREXCOM:EURUSD">EUR/USD</option>
+      <option value="FOREXCOM:USDJPY">USD/JPY</option>
+      <option value="FOREXCOM:GBPUSD">GBP/USD</option>
+      <option value="FOREXCOM:USDCHF">USD/CHF</option>
+      <option value="FOREXCOM:AUDUSD">AUD/USD</option>
+      <option value="FOREXCOM:USDCAD">USD/CAD</option>
+      <option value="FOREXCOM:NZDUSD">NZD/USD</option>
+    </select>
   </div>
   <div id="tvChartContainer"></div>
 </div>
@@ -684,13 +698,24 @@ function toggleTheme() {
 }
 
 let tvScriptLoaded = false;
+let currentTVSymbol = localStorage.getItem("tvSymbol") || "FOREXCOM:XAUUSD";
+
+function changeTVSymbol(symbol) {
+  currentTVSymbol = symbol;
+  localStorage.setItem("tvSymbol", symbol);
+  const label = symbol.replace("FOREXCOM:", "");
+  document.getElementById("tvChartTitle").textContent = label === "XAUUSD" ? "XAUUSD" : label.slice(0,3) + "/" + label.slice(3);
+  const theme = document.documentElement.getAttribute("data-theme") || "dark";
+  initTVWidget(theme);
+}
+
 function initTVWidget(theme) {
   const container = document.getElementById("tvChartContainer");
   container.innerHTML = "";
   function draw() {
     new TradingView.widget({
       "autosize": true,
-      "symbol": "FOREXCOM:XAUUSD",
+      "symbol": currentTVSymbol,
       "interval": "15",
       "timezone": "Etc/UTC",
       "theme": theme === "light" ? "light" : "dark",
@@ -757,6 +782,9 @@ function selectChart(which) {
   if (which === "tv") {
     document.getElementById("tvCard").style.display = "";
     document.getElementById("setupsCard").style.display = "none";
+    document.getElementById("tvSymbolSelect").value = currentTVSymbol;
+    const label = currentTVSymbol.replace("FOREXCOM:", "");
+    document.getElementById("tvChartTitle").textContent = label === "XAUUSD" ? "XAUUSD" : label.slice(0,3) + "/" + label.slice(3);
     initTVWidget(document.documentElement.getAttribute("data-theme") || "dark");
   } else {
     document.getElementById("tvCard").style.display = "none";
