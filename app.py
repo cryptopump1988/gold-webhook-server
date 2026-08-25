@@ -439,8 +439,6 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 }
 .ticker-item .tsym { font-weight:800; color:#39ff14; text-shadow: 0 0 6px rgba(57,255,20,0.95), 0 0 14px rgba(57,255,20,0.6); }
 .ticker-item .tprice { color:#39ff14; text-shadow: 0 0 5px rgba(57,255,20,0.8); font-weight:600; }
-.ticker-strip.forex .ticker-item .tsym { color:#ffcc00; text-shadow: 0 0 6px rgba(255,204,0,0.95), 0 0 14px rgba(255,204,0,0.6); }
-.ticker-strip.forex .ticker-item .tprice { color:#ffcc00; text-shadow: 0 0 5px rgba(255,204,0,0.8); }
 .ticker-item .tchange.up { color:#26a69a; font-weight:600; }
 .ticker-item .tchange.down { color:#ef5350; font-weight:600; }
 .ticker-item .tgainer-tag {
@@ -576,12 +574,6 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 <div class="ticker-strip" id="tickerStrip">
   <div class="ticker-track" id="tickerTrack">
     <span class="ticker-loading">Loading market data…</span>
-  </div>
-</div>
-
-<div class="ticker-strip forex" id="forexTickerStrip">
-  <div class="ticker-track" id="forexTickerTrack">
-    <span class="ticker-loading">Loading forex data…</span>
   </div>
 </div>
 
@@ -1137,36 +1129,11 @@ async function loadTicker() {
   }
 }
 
-async function loadForexTicker() {
-  try {
-    const res = await fetch("/forex-ticker");
-    const data = await res.json();
-    const pairs = data.pairs || [];
-    if (pairs.length === 0) {
-      document.getElementById("forexTickerTrack").innerHTML = '<span class="ticker-loading">Forex data unavailable — check /debug-crypto</span>';
-      return;
-    }
-    const itemHtml = (p) => {
-      const dir = p.change_pct >= 0 ? "up" : "down";
-      const arrow = p.change_pct >= 0 ? "▲" : "▼";
-      const decimals = p.price >= 10 ? 3 : 5;
-      const priceStr = p.price.toFixed(decimals);
-      return `<span class="ticker-item"><span class="tsym">${p.symbol}</span><span class="tprice">${priceStr}</span><span class="tchange ${dir}">${arrow} ${Math.abs(p.change_pct).toFixed(2)}%</span></span>`;
-    };
-    const html = pairs.map(itemHtml).join("") + pairs.map(itemHtml).join("");
-    document.getElementById("forexTickerTrack").innerHTML = html;
-  } catch (e) {
-    document.getElementById("forexTickerTrack").innerHTML = '<span class="ticker-loading">Forex data unavailable — check /debug-crypto</span>';
-  }
-}
-
 load();
 loadTicker();
-loadForexTicker();
 loadWeekStats();
 setInterval(load, 20000);
 setInterval(loadTicker, 120000);
-setInterval(loadForexTicker, 600000);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
@@ -1806,6 +1773,27 @@ def _fetch_coingecko_markets(**params):
     return r.json()
 
 
+@app.route("/debug-push", methods=["GET"])
+def debug_push():
+    result = {
+        "vapid_private_key_present": bool(VAPID_PRIVATE_KEY),
+        "vapid_public_key_present": bool(VAPID_PUBLIC_KEY),
+    }
+    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        result["problem"] = "VAPID_PRIVATE_KEY or VAPID_PUBLIC_KEY missing on Render. Push will silently no-op until both are set."
+        return Response(json.dumps(result, indent=2), mimetype="application/json")
+    try:
+        subs, _ = gh_load_json(SUBS_PATH)
+        result["subscription_count"] = len(subs) if subs else 0
+        if not subs:
+            result["problem"] = "No push subscriptions saved yet. Tap the bell icon in the app, allow notifications, then reload this page."
+        else:
+            result["endpoints"] = [s.get("endpoint", "")[:60] + "..." for s in subs]
+    except Exception as e:
+        result["problem"] = "Failed to read subscriptions file: " + repr(e)
+    return Response(json.dumps(result, indent=2), mimetype="application/json")
+
+
 @app.route("/debug-crypto", methods=["GET"])
 def debug_crypto():
     result = {}
@@ -1830,52 +1818,6 @@ def debug_crypto():
         result["coingecko_error"] = repr(e)
     return Response(json.dumps(result, indent=2, default=str), mimetype="application/json")
 
-
-FOREX_MAJOR_PAIRS = ["EUR/USD", "USD/JPY", "GBP/USD", "USD/CHF", "AUD/USD", "USD/CAD", "NZD/USD"]
-_forex_ticker_cache = {"data": None, "ts": 0}
-FOREX_TICKER_CACHE_TTL = 3600  # 1 hour - forex ticker is a bonus display, not a trading signal;
-                                 # keeps worst-case usage around 168 credits/day (7 pairs x 24 refreshes)
-
-
-def fetch_forex_ticker_via_twelvedata():
-    import time as _time
-    if not TWELVE_DATA_KEY:
-        return []
-    results = []
-    for i, pair in enumerate(FOREX_MAJOR_PAIRS):
-        if i > 0:
-            _time.sleep(0.12)
-        try:
-            r = requests.get("https://api.twelvedata.com/quote",
-                              params={"symbol": pair, "apikey": TWELVE_DATA_KEY}, timeout=15)
-            d = r.json()
-            if "close" not in d or "percent_change" not in d:
-                print("Twelve Data forex quote missing fields for", pair, ":", d)
-                continue
-            results.append({
-                "symbol": pair, "price": float(d["close"]),
-                "change_pct": float(d["percent_change"]), "type": "forex"
-            })
-        except Exception as e:
-            print("Twelve Data forex quote failed for", pair, ":", repr(e))
-            continue
-    return results
-
-
-@app.route("/forex-ticker", methods=["GET"])
-def forex_ticker():
-    import time as _time
-    now = _time.time()
-    if _forex_ticker_cache["data"] is not None and (now - _forex_ticker_cache["ts"]) < FOREX_TICKER_CACHE_TTL:
-        return Response(json.dumps({"pairs": _forex_ticker_cache["data"]}), mimetype="application/json")
-    results = fetch_forex_ticker_via_twelvedata()
-    if results:
-        _forex_ticker_cache["data"] = results
-        _forex_ticker_cache["ts"] = now
-        return Response(json.dumps({"pairs": results}), mimetype="application/json")
-    if _forex_ticker_cache["data"] is not None:
-        return Response(json.dumps({"pairs": _forex_ticker_cache["data"], "stale": True}), mimetype="application/json")
-    return Response(json.dumps({"pairs": []}), mimetype="application/json")
 
 
 @app.route("/crypto-ticker", methods=["GET"])
