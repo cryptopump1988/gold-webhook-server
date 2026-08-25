@@ -1675,8 +1675,6 @@ def debug_github():
 
 TWELVE_DATA_CRYPTO_MAP = {
     "BTC/USD": "BTC", "ETH/USD": "ETH", "BNB/USD": "BNB", "XRP/USD": "XRP", "SOL/USD": "SOL",
-    "TRX/USD": "TRX", "DOGE/USD": "DOGE", "ADA/USD": "ADA", "DOT/USD": "DOT", "LINK/USD": "LINK",
-    "AVAX/USD": "AVAX", "LTC/USD": "LTC", "ATOM/USD": "ATOM", "NEAR/USD": "NEAR", "SUI/USD": "SUI",
 }
 COINGECKO_ID_MAP = {
     "BTCUSDT": ("bitcoin", "BTC"), "ETHUSDT": ("ethereum", "ETH"), "BNBUSDT": ("binancecoin", "BNB"),
@@ -1687,7 +1685,7 @@ TOP_GAINERS_COUNT = 8
 MIN_MARKET_CAP_USD = 20_000_000  # filters out illiquid/low-cap noise from top gainers
 
 _crypto_cache = {"data": None, "ts": 0}
-CRYPTO_CACHE_TTL = 600  # seconds - crypto is a bonus feature; gold price reliability takes priority
+CRYPTO_CACHE_TTL = 1800  # 30 min - crypto is a bonus feature; gold price reliability takes priority
 
 
 def fetch_main_coins_via_twelvedata():
