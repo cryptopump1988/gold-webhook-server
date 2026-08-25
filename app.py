@@ -515,6 +515,10 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 }
 .chart-embed-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px; }
 .tv-note { padding:8px 16px; font-size:11px; line-height:1.4; color:var(--muted); border-bottom:1px solid var(--border); }
+.tv-open-btn {
+  background:var(--accent); color:#161b22; border:none; border-radius:8px; padding:7px 12px;
+  font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;
+}
 .chart-embed-header h2 { font-size:14px; margin:0; font-weight:700; }
 .chart-embed-header .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--buy); margin-right:6px; animation: pulse 1.5s infinite; }
 .symbol-select {
@@ -646,18 +650,9 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
       <option value="FOREXCOM:USDCAD">USD/CAD</option>
       <option value="FOREXCOM:NZDUSD">NZD/USD</option>
     </select>
-    <select id="tvIntervalSelect" class="symbol-select" onchange="changeTVInterval(this.value)">
-      <option value="1">1m</option>
-      <option value="5">5m</option>
-      <option value="15">15m</option>
-      <option value="60">60m</option>
-      <option value="240">4H</option>
-      <option value="D">1D</option>
-      <option value="W">1W</option>
-    </select>
-    <button class="switch-btn" id="openTVBtn" onclick="openInTradingView()" title="Open this chart on TradingView to add your indicator">↗ Open in TradingView</button>
+    <button class="tv-open-btn" id="openTVBtn" onclick="openInTradingView()">↗ Open in TradingView</button>
   </div>
-  <div class="tv-note">Add your CHoCH indicator on TradingView directly: tap "Open in TradingView" above, then Indicators → My Scripts → your script. This can't be automated from here — TradingView doesn't allow outside apps to add indicators to a chart, even public/published ones.</div>
+  <div class="tv-note">Add your CHoCH indicator on TradingView directly: tap "Open in TradingView" above, then Indicators → My Scripts → your script. Use the resolution buttons (1m / 30m / 1h ...) right below the chart to change timeframe — that's TradingView's own control, already built in.</div>
   <div id="tvChartContainer"></div>
 </div>
 
@@ -711,7 +706,7 @@ function toggleTheme() {
 
 let tvScriptLoaded = false;
 let currentTVSymbol = localStorage.getItem("tvSymbol") || "FOREXCOM:XAUUSD";
-let currentTVInterval = localStorage.getItem("tvInterval") || "15";
+const DEFAULT_TV_INTERVAL = "15";
 
 function changeTVSymbol(symbol) {
   currentTVSymbol = symbol;
@@ -722,20 +717,13 @@ function changeTVSymbol(symbol) {
   initTVWidget(theme);
 }
 
-function changeTVInterval(interval) {
-  currentTVInterval = interval;
-  localStorage.setItem("tvInterval", interval);
-  const theme = document.documentElement.getAttribute("data-theme") || "dark";
-  initTVWidget(theme);
-}
-
 function openInTradingView() {
-  // Deep-link to TradingView with symbol + interval pre-loaded.
+  // Deep-link to TradingView with the current symbol pre-loaded.
   // NOTE: TradingView does not allow any outside app to auto-apply an
   // indicator to the chart -- you still add it manually once there via
   // Indicators -> My Scripts. This is a TradingView platform limit, not
   // something this app can bypass, even for public/published scripts.
-  const url = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(currentTVSymbol) + "&interval=" + encodeURIComponent(currentTVInterval);
+  const url = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(currentTVSymbol) + "&interval=" + DEFAULT_TV_INTERVAL;
   window.open(url, "_blank");
 }
 
@@ -746,7 +734,7 @@ function initTVWidget(theme) {
     new TradingView.widget({
       "autosize": true,
       "symbol": currentTVSymbol,
-      "interval": currentTVInterval,
+      "interval": DEFAULT_TV_INTERVAL,
       "timezone": "Etc/UTC",
       "theme": theme === "light" ? "light" : "dark",
       "style": "1",
@@ -813,7 +801,6 @@ function selectChart(which) {
     document.getElementById("tvCard").style.display = "";
     document.getElementById("setupsCard").style.display = "none";
     document.getElementById("tvSymbolSelect").value = currentTVSymbol;
-    document.getElementById("tvIntervalSelect").value = currentTVInterval;
     const label = currentTVSymbol.replace("FOREXCOM:", "");
     document.getElementById("tvChartTitle").textContent = label === "XAUUSD" ? "XAUUSD" : label.slice(0,3) + "/" + label.slice(3);
     initTVWidget(document.documentElement.getAttribute("data-theme") || "dark");
@@ -1130,7 +1117,10 @@ async function loadTicker() {
     const res = await fetch("/crypto-ticker");
     const data = await res.json();
     const coins = data.coins || [];
-    if (coins.length === 0) return;
+    if (coins.length === 0) {
+      document.getElementById("tickerTrack").innerHTML = '<span class="ticker-loading">Market data unavailable — check /debug-crypto</span>';
+      return;
+    }
     const itemHtml = (c) => {
       const dir = c.change_pct >= 0 ? "up" : "down";
       const arrow = c.change_pct >= 0 ? "▲" : "▼";
@@ -1143,7 +1133,7 @@ async function loadTicker() {
     const html = coins.map(itemHtml).join("") + coins.map(itemHtml).join("");
     document.getElementById("tickerTrack").innerHTML = html;
   } catch (e) {
-    // leave existing ticker content in place on a transient failure
+    document.getElementById("tickerTrack").innerHTML = '<span class="ticker-loading">Market data unavailable — check /debug-crypto</span>';
   }
 }
 
@@ -1152,7 +1142,10 @@ async function loadForexTicker() {
     const res = await fetch("/forex-ticker");
     const data = await res.json();
     const pairs = data.pairs || [];
-    if (pairs.length === 0) return;
+    if (pairs.length === 0) {
+      document.getElementById("forexTickerTrack").innerHTML = '<span class="ticker-loading">Forex data unavailable — check /debug-crypto</span>';
+      return;
+    }
     const itemHtml = (p) => {
       const dir = p.change_pct >= 0 ? "up" : "down";
       const arrow = p.change_pct >= 0 ? "▲" : "▼";
@@ -1163,7 +1156,7 @@ async function loadForexTicker() {
     const html = pairs.map(itemHtml).join("") + pairs.map(itemHtml).join("");
     document.getElementById("forexTickerTrack").innerHTML = html;
   } catch (e) {
-    // leave existing ticker content in place on a transient failure
+    document.getElementById("forexTickerTrack").innerHTML = '<span class="ticker-loading">Forex data unavailable — check /debug-crypto</span>';
   }
 }
 
