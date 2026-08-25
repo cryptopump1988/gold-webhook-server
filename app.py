@@ -3,7 +3,7 @@ import requests
 import os
 import json
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 from pywebpush import webpush, WebPushException
 
 app = Flask(__name__)
@@ -491,26 +491,6 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 .week-cell.sl .num { color:var(--sell); }
 .week-cell.tp .num { color:var(--buy); }
 .week-note { font-size:11px; color:var(--muted); margin-top:10px; text-align:center; line-height:1.6; }
-.context-panel {
-  margin:14px 16px 0; background:var(--card); border:1px solid var(--border); border-radius:16px;
-  padding:16px; box-shadow: var(--shadow);
-}
-.context-panel h2 { font-size:14px; margin:0 0 12px; font-weight:700; display:flex; align-items:center; gap:6px; }
-.context-row { display:flex; gap:10px; margin-bottom:12px; }
-.context-cell { flex:1; text-align:center; padding:10px 4px; border-radius:10px; background:var(--card2); }
-.context-cell .num { font-size:18px; font-weight:800; }
-.context-cell .lbl { font-size:10.5px; color:var(--muted); margin-top:3px; }
-.context-cell.trending .num, .context-cell.bullish .num { color:var(--buy); }
-.context-cell.bearish .num { color:var(--sell); }
-.levels-section { margin-top:10px; }
-.levels-title { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.4px; }
-.levels-list { display:flex; flex-wrap:wrap; gap:6px; }
-.level-chip {
-  font-size:11px; padding:4px 9px; border-radius:8px; background:var(--card2); border:1px solid var(--border);
-}
-.level-chip.res { color:var(--sell); }
-.level-chip.sup { color:var(--buy); }
-.context-loading { font-size:12px; color:var(--muted); text-align:center; padding:8px 0; }
 .stat-pill {
   background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 16px;
   min-width:84px; text-align:center; flex-shrink:0; box-shadow: var(--shadow);
@@ -577,6 +557,8 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
     <button class="switch-btn" id="switchBtn" onclick="openChooser()">📊</button>
     <button class="switch-btn" id="notifyBtn" onclick="enablePush()">🔔</button>
     <button class="switch-btn" id="settingsBtn" onclick="openSettings()">⚙️</button>
+    <button class="switch-btn" onclick="window.location.href='/history'">🕘</button>
+    <button class="switch-btn" onclick="window.location.href='/news'">📰</button>
   </div>
 </div>
 
@@ -663,11 +645,6 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
     <div class="week-cell"><div class="num">...</div><div class="lbl">Still Open</div></div>
   </div>
   <div class="week-note" id="weekNote"></div>
-</div>
-
-<div class="context-panel" id="contextPanel">
-  <h2>📊 Market Context <span style="font-weight:400;color:var(--muted);font-size:11px">XAUUSD</span></h2>
-  <div id="contextBody"><div class="context-loading">Loading market context…</div></div>
 </div>
 
 <div class="stats-strip" id="statsStrip"></div>
@@ -1103,59 +1080,11 @@ async function loadTicker() {
   }
 }
 
-async function loadMarketContext() {
-  try {
-    const res = await fetch("/market-context");
-    const m = await res.json();
-    const body = document.getElementById("contextBody");
-
-    if (m.rsi === null || m.rsi === undefined) {
-      body.innerHTML = '<div class="context-loading">Not enough price history yet.</div>';
-      return;
-    }
-
-    const trendClass = m.trend_label === "Trending" ? "trending" : "";
-    const momClass = m.momentum_label === "Bullish" ? "bullish" : (m.momentum_label === "Bearish" ? "bearish" : "");
-
-    let html = `<div class="context-row">
-      <div class="context-cell"><div class="num">${m.rsi}</div><div class="lbl">RSI (14)</div></div>
-      <div class="context-cell ${trendClass}"><div class="num">${m.adx}</div><div class="lbl">ADX · ${m.trend_label || ""}</div></div>
-      <div class="context-cell ${momClass}"><div class="num">${m.momentum_label || "—"}</div><div class="lbl">Momentum</div></div>
-    </div>`;
-
-    if (m.pivots) {
-      html += `<div class="levels-section"><div class="levels-title">Pivot Levels (Daily)</div><div class="levels-list">`;
-      html += `<span class="level-chip res">R3 ${m.pivots.r3.toLocaleString()}</span>`;
-      html += `<span class="level-chip res">R2 ${m.pivots.r2.toLocaleString()}</span>`;
-      html += `<span class="level-chip res">R1 ${m.pivots.r1.toLocaleString()}</span>`;
-      html += `<span class="level-chip">PP ${m.pivots.pp.toLocaleString()}</span>`;
-      html += `<span class="level-chip sup">S1 ${m.pivots.s1.toLocaleString()}</span>`;
-      html += `<span class="level-chip sup">S2 ${m.pivots.s2.toLocaleString()}</span>`;
-      html += `<span class="level-chip sup">S3 ${m.pivots.s3.toLocaleString()}</span>`;
-      html += `</div></div>`;
-    }
-
-    if (m.fib_levels) {
-      html += `<div class="levels-section"><div class="levels-title">Fibonacci Retracements</div><div class="levels-list">`;
-      for (const pct of ["0.236", "0.382", "0.5", "0.618", "0.786"]) {
-        html += `<span class="level-chip">${(parseFloat(pct)*100).toFixed(1)}% ${m.fib_levels[pct].toLocaleString()}</span>`;
-      }
-      html += `</div></div>`;
-    }
-
-    body.innerHTML = html;
-  } catch (e) {
-    document.getElementById("contextBody").innerHTML = '<div class="context-loading">Could not load market context.</div>';
-  }
-}
-
 load();
 loadTicker();
 loadWeekStats();
-loadMarketContext();
 setInterval(load, 20000);
 setInterval(loadTicker, 120000);
-setInterval(loadMarketContext, 60000);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
@@ -1225,6 +1154,249 @@ def icon192():
 @app.route("/icon512.png", methods=["GET"])
 def icon512():
     return Response(base64.b64decode(ICON_512_B64), mimetype="image/png")
+
+
+FOREX_CURRENCIES = {"EUR", "USD", "JPY", "GBP", "CHF", "AUD", "CAD", "NZD"}
+FF_NOTIFIED_PATH = "data/ff_notified.json"
+FF_SETTINGS_PATH = "data/ff_settings.json"
+FF_ALERT_WINDOW_SECONDS = 15 * 60  # matches the ~15-min external check interval
+
+_ff_cache = {"data": None, "ts": 0}
+FF_CACHE_TTL = 1800  # 30 min - Forex Factory limits their feed to 2 requests/5min
+
+
+def fetch_forex_calendar():
+    import time as _time
+    now = _time.time()
+    if _ff_cache["data"] is not None and (now - _ff_cache["ts"]) < FF_CACHE_TTL:
+        return _ff_cache["data"]
+    try:
+        r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=20)
+        r.raise_for_status()
+        raw = r.json()
+    except Exception as e:
+        print("Forex Factory calendar fetch failed:", repr(e))
+        return _ff_cache["data"] if _ff_cache["data"] is not None else []
+
+    events = []
+    for e in raw:
+        if e.get("country") not in FOREX_CURRENCIES:
+            continue
+        try:
+            dt = datetime.fromisoformat(e["date"])
+        except Exception:
+            continue
+        events.append({
+            "title": e.get("title", ""), "country": e["country"], "impact": e.get("impact", ""),
+            "forecast": e.get("forecast", ""), "previous": e.get("previous", ""),
+            "date_iso": dt.isoformat(), "time_unix": int(dt.timestamp()),
+        })
+    events.sort(key=lambda x: x["time_unix"])
+    _ff_cache["data"] = events
+    _ff_cache["ts"] = now
+    return events
+
+
+@app.route("/forex-news", methods=["GET"])
+def forex_news():
+    events = fetch_forex_calendar()
+    now_unix = int(datetime.now(timezone.utc).timestamp())
+    upcoming = [e for e in events if e["time_unix"] >= now_unix - 3600]
+    return Response(json.dumps({"events": upcoming}), mimetype="application/json")
+
+
+@app.route("/forex-alerts-setting", methods=["GET", "POST"])
+def forex_alerts_setting():
+    settings, sha = gh_load_json(FF_SETTINGS_PATH)
+    current = settings[0] if isinstance(settings, list) and settings else {"enabled": True}
+    if request.method == "GET":
+        return Response(json.dumps(current), mimetype="application/json")
+    body = request.get_json(silent=True) or {}
+    current = {"enabled": bool(body.get("enabled", True))}
+    gh_save_json(FF_SETTINGS_PATH, [current], sha)
+    return Response(json.dumps(current), mimetype="application/json")
+
+
+@app.route("/check-forex-news", methods=["GET"])
+def check_forex_news():
+    settings, _ = gh_load_json(FF_SETTINGS_PATH)
+    enabled = True
+    if isinstance(settings, list) and settings:
+        enabled = bool(settings[0].get("enabled", True))
+    if not enabled:
+        return json.dumps({"skipped": "alerts disabled"}), 200
+
+    events = fetch_forex_calendar()
+    now_unix = int(datetime.now(timezone.utc).timestamp())
+    imminent = [
+        e for e in events
+        if e["impact"] == "High" and now_unix <= e["time_unix"] <= now_unix + FF_ALERT_WINDOW_SECONDS
+    ]
+    if not imminent:
+        return json.dumps({"checked": len(events), "notified": 0}), 200
+
+    notified_list, sha = gh_load_json(FF_NOTIFIED_PATH)
+    if not isinstance(notified_list, list):
+        notified_list = []
+    notified_keys = set(notified_list)
+    cutoff = now_unix - 7 * 24 * 3600
+    notified_list = [k for k in notified_list if int(k.split("|")[-1]) >= cutoff]
+
+    sent = 0
+    for e in imminent:
+        key = f"{e['country']}|{e['title']}|{e['time_unix']}"
+        if key in notified_keys:
+            continue
+        try:
+            send_push_to_all(
+                f"📰 {e['country']} High Impact: {e['title']}",
+                f"Forecast {e['forecast'] or 'N/A'} | Previous {e['previous'] or 'N/A'}",
+                "/news"
+            )
+            notified_list.append(key)
+            sent += 1
+        except Exception as ex:
+            print("Forex news push failed for", key, ":", repr(ex))
+
+    gh_save_json(FF_NOTIFIED_PATH, notified_list, sha)
+    return json.dumps({"checked": len(events), "notified": sent}), 200
+
+
+@app.route("/news", methods=["GET"])
+def forex_news_page():
+    html = r"""<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forex News</title>
+<style>
+body { background:#0f1115; color:#eee; font-family:-apple-system,sans-serif; padding:16px; margin:0; }
+h2 { margin:0 0 4px; font-size:20px; }
+.sub { color:#888; font-size:12px; margin-bottom:14px; }
+.toggle-row { display:flex; justify-content:space-between; align-items:center; background:#1a1d24; border:1px solid #2a2e39; border-radius:12px; padding:12px 14px; margin-bottom:16px; }
+.toggle { width:44px; height:26px; border-radius:20px; background:#333; position:relative; cursor:pointer; transition:background 0.2s; }
+.toggle.on { background:#2ea043; }
+.toggle .knob { position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%; background:white; transition:transform 0.2s; }
+.toggle.on .knob { transform:translateX(18px); }
+.item { background:#1a1d24; border:1px solid #2a2e39; border-radius:12px; padding:12px 14px; margin-bottom:8px; }
+.item .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; }
+.badge.High { background:#3a1a1a; color:#ef5350; }
+.badge.Medium { background:#3a2f1a; color:#f4c430; }
+.badge.Low { background:#1a2a1a; color:#8fbf8f; }
+.ccy { font-weight:700; font-size:12px; color:#aaa; }
+.time { font-size:11px; color:#888; }
+.title { font-size:13.5px; margin-top:4px; }
+.fc { font-size:11.5px; color:#888; margin-top:3px; }
+.empty { text-align:center; color:#888; padding:40px 0; font-size:13px; }
+</style></head>
+<body>
+<h2>📰 Forex News</h2>
+<div class="sub">High-impact economic events for EUR, USD, JPY, GBP, CHF, AUD, CAD, NZD</div>
+<div class="toggle-row">
+  <span>Push alerts for high-impact events</span>
+  <div class="toggle" id="ffToggle" onclick="toggleAlerts()"><div class="knob"></div></div>
+</div>
+<div id="list"><div class="empty">Loading…</div></div>
+<script>
+async function loadToggle() {
+  try {
+    const res = await fetch("/forex-alerts-setting");
+    const s = await res.json();
+    document.getElementById("ffToggle").classList.toggle("on", s.enabled !== false);
+  } catch (e) {}
+}
+async function toggleAlerts() {
+  const el = document.getElementById("ffToggle");
+  const newState = !el.classList.contains("on");
+  el.classList.toggle("on", newState);
+  await fetch("/forex-alerts-setting", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({enabled: newState})
+  });
+}
+async function loadNews() {
+  const list = document.getElementById("list");
+  try {
+    const res = await fetch("/forex-news");
+    const data = await res.json();
+    const events = data.events || [];
+    if (events.length === 0) {
+      list.innerHTML = '<div class="empty">No upcoming events found.</div>';
+      return;
+    }
+    list.innerHTML = events.map(e => {
+      const d = new Date(e.time_unix * 1000);
+      const timeStr = d.toLocaleString(undefined, {weekday:"short", hour:"2-digit", minute:"2-digit", month:"short", day:"numeric"});
+      return `<div class="item">
+        <div class="top"><span class="ccy">${e.country}</span><span class="badge ${e.impact}">${e.impact || "?"}</span></div>
+        <div class="title">${e.title}</div>
+        <div class="fc">Forecast: ${e.forecast || "-"} · Previous: ${e.previous || "-"}</div>
+        <div class="time">${timeStr}</div>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    list.innerHTML = '<div class="empty">Could not load news.</div>';
+  }
+}
+loadToggle();
+loadNews();
+</script>
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
+
+@app.route("/history", methods=["GET"])
+def notification_history_page():
+    html = r"""<!DOCTYPE html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notification History</title>
+<style>
+body { background:#0f1115; color:#eee; font-family:-apple-system,sans-serif; padding:16px; margin:0; }
+h2 { margin:0 0 4px; font-size:20px; }
+.sub { color:#888; font-size:12px; margin-bottom:16px; }
+.item {
+  background:#1a1d24; border:1px solid #2a2e39; border-radius:12px; padding:12px 14px; margin-bottom:10px;
+}
+.item .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; }
+.badge.buy { background:#1a3a2e; color:#26a69a; }
+.badge.sell { background:#3a1a1a; color:#ef5350; }
+.badge.touch { background:#3a2f1a; color:#f4c430; }
+.time { font-size:11px; color:#888; }
+.detail { font-size:12.5px; color:#bbb; margin-top:4px; }
+.empty { text-align:center; color:#888; padding:40px 0; font-size:13px; }
+</style></head>
+<body>
+<h2>🔔 Notification History</h2>
+<div class="sub">Every setup and zone-touch alert ever sent - useful if you missed push notifications while offline.</div>
+<div id="list"><div class="empty">Loading…</div></div>
+<script>
+async function load() {
+  const list = document.getElementById("list");
+  try {
+    const res = await fetch("/latest");
+    const data = await res.json();
+    const signals = data.signals || [];
+    if (signals.length === 0) {
+      list.innerHTML = '<div class="empty">No notifications yet.</div>';
+      return;
+    }
+    list.innerHTML = signals.map(s => {
+      const isTouch = s.kind === "touch";
+      const badgeClass = isTouch ? "touch" : (s.signal === "BUY" ? "buy" : "sell");
+      const label = isTouch ? "ZONE TOUCH" : s.signal;
+      return `<div class="item">
+        <div class="top"><span class="badge ${badgeClass}">${label}</span><span class="time">${s.time || ""}</span></div>
+        <div class="detail">${s.symbol || "XAUUSD"} · Entry ${s.entry || "-"} · SL ${s.sl || "-"} · TP1 ${s.tp1 || "-"}</div>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    list.innerHTML = '<div class="empty">Could not load history.</div>';
+  }
+}
+load();
+</script>
+</body></html>"""
+    return Response(html, mimetype="text/html")
 
 
 @app.route("/add", methods=["GET"])
@@ -1299,89 +1471,6 @@ SWING_LEN = 5
 ATR_LEN = 14
 SL_BUFFER_MULT = 0.25
 RR = [1.0, 2.0, 3.0]
-
-
-def compute_rsi(bars, length=14):
-    closes = [b["close"] for b in bars]
-    n = len(closes)
-    rsi = [None] * n
-    if n < length + 1:
-        return rsi
-    gains, losses = [], []
-    for i in range(1, n):
-        change = closes[i] - closes[i - 1]
-        gains.append(max(change, 0))
-        losses.append(max(-change, 0))
-    avg_gain = sum(gains[:length]) / length
-    avg_loss = sum(losses[:length]) / length
-    rsi[length] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
-    for i in range(length + 1, n):
-        g = gains[i - 1]
-        l = losses[i - 1]
-        avg_gain = (avg_gain * (length - 1) + g) / length
-        avg_loss = (avg_loss * (length - 1) + l) / length
-        rsi[i] = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
-    return rsi
-
-
-def compute_adx(bars, length=14):
-    n = len(bars)
-    adx = [None] * n
-    if n < length * 2 + 1:
-        return adx
-    plus_dm, minus_dm, tr = [0.0], [0.0], [0.0]
-    for i in range(1, n):
-        up_move = bars[i]["high"] - bars[i - 1]["high"]
-        down_move = bars[i - 1]["low"] - bars[i]["low"]
-        plus_dm.append(up_move if (up_move > down_move and up_move > 0) else 0.0)
-        minus_dm.append(down_move if (down_move > up_move and down_move > 0) else 0.0)
-        pc = bars[i - 1]["close"]
-        tr.append(max(bars[i]["high"] - bars[i]["low"], abs(bars[i]["high"] - pc), abs(bars[i]["low"] - pc)))
-
-    def wilder_smooth(vals, length):
-        sm = [None] * len(vals)
-        sm[length] = sum(vals[1:length + 1])
-        for i in range(length + 1, len(vals)):
-            sm[i] = sm[i - 1] - (sm[i - 1] / length) + vals[i]
-        return sm
-
-    sm_plus_dm = wilder_smooth(plus_dm, length)
-    sm_minus_dm = wilder_smooth(minus_dm, length)
-    sm_tr = wilder_smooth(tr, length)
-    dx = [None] * n
-    for i in range(length, n):
-        if sm_tr[i] in (None, 0):
-            continue
-        plus_di = 100 * sm_plus_dm[i] / sm_tr[i]
-        minus_di = 100 * sm_minus_dm[i] / sm_tr[i]
-        denom = plus_di + minus_di
-        dx[i] = 100 * abs(plus_di - minus_di) / denom if denom != 0 else 0
-    first_adx_idx = None
-    for i in range(length * 2, n):
-        window = [v for v in dx[i - length + 1:i + 1] if v is not None]
-        if len(window) == length:
-            adx[i] = sum(window) / length
-            first_adx_idx = i
-            break
-    if first_adx_idx is not None:
-        for i in range(first_adx_idx + 1, n):
-            if dx[i] is not None:
-                adx[i] = (adx[i - 1] * (length - 1) + dx[i]) / length
-    return adx
-
-
-def compute_pivot_points(prev_high, prev_low, prev_close):
-    pp = (prev_high + prev_low + prev_close) / 3
-    return {
-        "pp": pp,
-        "r1": 2 * pp - prev_low, "r2": pp + (prev_high - prev_low), "r3": prev_high + 2 * (pp - prev_low),
-        "s1": 2 * pp - prev_high, "s2": pp - (prev_high - prev_low), "s3": prev_low - 2 * (prev_high - pp),
-    }
-
-
-def compute_fib_retracements(swing_high, swing_low):
-    diff = swing_high - swing_low
-    return {str(pct): swing_high - diff * pct for pct in [0.236, 0.382, 0.5, 0.618, 0.786]}
 
 
 def compute_atr(bars, length):
@@ -1582,50 +1671,6 @@ def debug_github():
         result["request_exception"] = str(e)
 
     return Response(json.dumps(result, indent=2), mimetype="application/json")
-
-
-@app.route("/market-context", methods=["GET"])
-def market_context():
-    result = {}
-
-    bars15 = fetch_ohlc(interval="15min", outputsize=300)
-    if bars15 and len(bars15) > 40:
-        rsi_series = compute_rsi(bars15)
-        adx_series = compute_adx(bars15)
-        latest_rsi = next((v for v in reversed(rsi_series) if v is not None), None)
-        latest_adx = next((v for v in reversed(adx_series) if v is not None), None)
-        result["rsi"] = round(latest_rsi, 1) if latest_rsi is not None else None
-        result["adx"] = round(latest_adx, 1) if latest_adx is not None else None
-        result["current_price"] = bars15[-1]["close"]
-
-        if result["rsi"] is not None:
-            if result["rsi"] >= 60:
-                result["momentum_label"] = "Bullish"
-            elif result["rsi"] <= 40:
-                result["momentum_label"] = "Bearish"
-            else:
-                result["momentum_label"] = "Neutral"
-        if result["adx"] is not None:
-            result["trend_label"] = "Trending" if result["adx"] >= 25 else "Ranging"
-
-        swing_high = max(b["high"] for b in bars15)
-        swing_low = min(b["low"] for b in bars15)
-        result["swing_high"] = swing_high
-        result["swing_low"] = swing_low
-        result["fib_levels"] = {k: round(v, 2) for k, v in compute_fib_retracements(swing_high, swing_low).items()}
-    else:
-        result["rsi"] = None
-        result["adx"] = None
-
-    daily_bars = fetch_ohlc(interval="1day", outputsize=5)
-    if daily_bars and len(daily_bars) >= 2:
-        prev_day = daily_bars[-2]
-        piv = compute_pivot_points(prev_day["high"], prev_day["low"], prev_day["close"])
-        result["pivots"] = {k: round(v, 2) for k, v in piv.items()}
-    else:
-        result["pivots"] = None
-
-    return Response(json.dumps(result), mimetype="application/json")
 
 
 TWELVE_DATA_CRYPTO_MAP = {
