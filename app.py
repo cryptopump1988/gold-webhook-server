@@ -558,6 +558,19 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 .empty { text-align:center; color:var(--muted); padding:80px 24px; }
 .empty .emoji { font-size:42px; margin-bottom:14px; }
 .section-title { padding:10px 16px 0; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.6px; font-weight:700; }
+.ind-upd { font-size:11px; color:var(--muted); }
+.ind-legend { display:flex; flex-wrap:wrap; gap:10px 14px; padding:8px 14px 0; font-size:11px; color:var(--muted); }
+.ind-legend i { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:5px; }
+.ind-info { padding:10px 14px 14px; font-size:13px; }
+.ind-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px; flex-wrap:wrap; }
+.ind-chip { padding:3px 10px; border-radius:20px; font-weight:700; font-size:12px; }
+.ind-chip.buy { background:var(--buy-bg); color:var(--buy); }
+.ind-chip.sell { background:var(--sell-bg); color:var(--sell); }
+.ind-chip.neutral { background:var(--card2); color:var(--muted); }
+.ind-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+.ind-cell { background:var(--card2); border-radius:8px; padding:6px 4px; text-align:center; }
+.ind-cell .v { font-weight:700; font-size:12px; }
+.ind-cell .l { font-size:10px; color:var(--muted); margin-top:2px; }
 </style>
 </head>
 <body>
@@ -594,6 +607,13 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
   <div class="chooser-box">
     <h2>Choose Your Chart</h2>
     <p>Pick which chart view you'd like to see</p>
+    <div class="chooser-option" onclick="selectChart('ind')">
+      <div class="chooser-icon">🥇</div>
+      <div>
+        <div class="chooser-title">Gold Indicator Chart</div>
+        <div class="chooser-desc">XAUUSD 15M with your indicator: structure, BUY/SELL signals, Entry / SL / TP levels</div>
+      </div>
+    </div>
     <div class="chooser-option" onclick="selectChart('tv')">
       <div class="chooser-icon">📊</div>
       <div>
@@ -668,6 +688,23 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
   <div id="setupsTooltip" class="setups-tooltip" style="display:none;"></div>
 </div>
 
+<div class="chart-embed-card" id="indCard" style="display:none;">
+  <div class="chart-embed-header">
+    <h2><span class="live-dot"></span>XAUUSD Gold Indicator</h2>
+    <span class="ind-upd" id="indUpdated"></span>
+  </div>
+  <div id="indChartContainer" style="height:420px; position:relative;"></div>
+  <div class="ind-legend">
+    <span><i style="border-color:#ff9800"></i>Swing High</span>
+    <span><i style="border-color:#42a5f5"></i>Swing Low</span>
+    <span><i style="border-color:#2962ff"></i>Entry</span>
+    <span><i style="border-color:#f85149"></i>SL</span>
+    <span><i style="border-color:#3fb950"></i>TP1-3</span>
+    <span><i style="border-color:#d4af37"></i>Zone re-touch</span>
+  </div>
+  <div class="ind-info" id="indInfo">Loading indicator...</div>
+</div>
+
 <div class="week-panel" id="weekPanel">
   <h2>📅 Last 7 Days</h2>
   <div class="week-grid" id="weekGrid">
@@ -691,6 +728,7 @@ function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", t);
   document.getElementById("themeKnob").textContent = t === "light" ? "\u2600\ufe0f" : "\ud83c\udf19";
   localStorage.setItem("theme", t);
+  if (typeof indApplyTheme === "function") indApplyTheme(t);
   const choice = localStorage.getItem("chartChoice");
   if (choice === "tv" && tvScriptLoaded !== undefined) {
     if (document.getElementById("tvCard").style.display !== "none") initTVWidget(t);
@@ -786,19 +824,148 @@ function toggleSound() {
 let lwScriptLoaded = false;
 let setupsChartBuilt = false;
 
+// ============= GOLD INDICATOR CHART (in-app) =============
+let indBuilt = false, indTimer = null, indChart = null, indCandles = null, indHi = null, indLo = null, indLevelSeries = [], indFirstFit = true;
+const IND_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function indPad(n) { return n < 10 ? "0" + n : "" + n; }
+function indFmtIST(ts) {
+  const d = new Date((ts + 19800) * 1000);
+  return d.getUTCDate() + " " + IND_MON[d.getUTCMonth()] + " " + indPad(d.getUTCHours()) + ":" + indPad(d.getUTCMinutes());
+}
+function indColors(t) {
+  const l = t === "light";
+  return { bg: l ? "#ffffff" : "#131722", tx: l ? "#16181d" : "#d1d4dc", gr: l ? "#e2e6ea" : "#242832" };
+}
+function indApplyTheme(t) {
+  if (!indChart) return;
+  const c = indColors(t);
+  indChart.applyOptions({ layout: { background: { color: c.bg }, textColor: c.tx }, grid: { vertLines: { color: c.gr }, horzLines: { color: c.gr } } });
+}
+
+function initIndChart() {
+  function build() {
+    if (indBuilt) { loadIndData(); startIndTimer(); return; }
+    indBuilt = true;
+    const c = indColors(document.documentElement.getAttribute("data-theme") || "dark");
+    indChart = LightweightCharts.createChart(document.getElementById("indChartContainer"), {
+      layout: { background: { color: c.bg }, textColor: c.tx },
+      grid: { vertLines: { color: c.gr }, horzLines: { color: c.gr } },
+      rightPriceScale: { borderVisible: false },
+      timeScale: {
+        timeVisible: true, secondsVisible: false, rightOffset: 6, borderVisible: false,
+        tickMarkFormatter: function(time, type) {
+          const d = new Date((time + 19800) * 1000);
+          if (type <= 2) return d.getUTCDate() + " " + IND_MON[d.getUTCMonth()];
+          return indPad(d.getUTCHours()) + ":" + indPad(d.getUTCMinutes());
+        }
+      },
+      localization: { timeFormatter: function(time) { return indFmtIST(time) + " IST"; } },
+      autoSize: true
+    });
+    indCandles = indChart.addCandlestickSeries({
+      upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
+      wickUpColor: "#26a69a", wickDownColor: "#ef5350"
+    });
+    indHi = indChart.addLineSeries({ color: "#ff9800", lineWidth: 1, lineStyle: 2, lineType: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    indLo = indChart.addLineSeries({ color: "#42a5f5", lineWidth: 1, lineStyle: 2, lineType: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    loadIndData();
+    startIndTimer();
+  }
+  if (lwScriptLoaded) { build(); return; }
+  const s = document.createElement("script");
+  s.src = "https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js";
+  s.onload = function() { lwScriptLoaded = true; build(); };
+  document.body.appendChild(s);
+}
+
+function startIndTimer() {
+  if (indTimer) return;
+  indTimer = setInterval(function() {
+    if (document.getElementById("indCard").style.display !== "none") loadIndData();
+  }, 60000);
+}
+
+async function loadIndData() {
+  const info = document.getElementById("indInfo");
+  try {
+    const res = await fetch("/indicator-data");
+    const data = await res.json();
+    const bars = data.bars || [];
+    if (!bars.length) { info.textContent = "No candle data yet (" + (data.error || "waiting for first update") + ")."; return; }
+    indCandles.setData(bars);
+    indHi.setData(data.struct_high || []);
+    indLo.setData(data.struct_low || []);
+    const firstT = bars[0].time, lastT = bars[bars.length - 1].time;
+
+    const markers = [];
+    (data.events || []).forEach(function(ev) {
+      const t = ev.time_unix - (ev.time_unix % 900);
+      if (t < firstT) return;
+      const buy = ev.signal === "BUY";
+      if (ev.kind === "signal") {
+        markers.push({ time: t, position: buy ? "belowBar" : "aboveBar", color: buy ? "#3fb950" : "#f85149", shape: buy ? "arrowUp" : "arrowDown", text: ev.signal });
+      } else {
+        markers.push({ time: t, position: buy ? "belowBar" : "aboveBar", color: "#d4af37", shape: "circle", text: "" });
+      }
+    });
+    markers.sort(function(a, b) { return a.time - b.time; });
+    indCandles.setMarkers(markers);
+
+    indLevelSeries.forEach(function(s) { indChart.removeSeries(s); });
+    indLevelSeries = [];
+    const L = data.latest;
+    if (L) {
+      const t1 = Math.max(L.time_unix - (L.time_unix % 900), firstT);
+      const defs = [["Entry", L.entry, "#2962ff", 0, 2], ["SL", L.sl, "#f85149", 0, 2], ["TP1", L.tp1, "#3fb950", 2, 1], ["TP2", L.tp2, "#3fb950", 2, 1], ["TP3", L.tp3, "#3fb950", 2, 1]];
+      defs.forEach(function(d) {
+        const s = indChart.addLineSeries({ color: d[2], lineWidth: d[4], lineStyle: d[3], priceLineVisible: false, lastValueVisible: true, title: d[0], crosshairMarkerVisible: false });
+        s.setData(t1 < lastT ? [{ time: t1, value: d[1] }, { time: lastT, value: d[1] }] : [{ time: lastT, value: d[1] }]);
+        indLevelSeries.push(s);
+      });
+    }
+    if (indFirstFit) {
+      indFirstFit = false;
+      const n = bars.length;
+      indChart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 110), to: n + 6 });
+    }
+
+    document.getElementById("indUpdated").textContent = (data.market_closed ? "Market closed · " : "") + "updated " + indFmtIST(data.updated || lastT) + " IST";
+    if (L) {
+      const buy = L.signal === "BUY";
+      const st = L.status || "Active";
+      const stColor = st === "Active" ? "var(--accent)" : (st.indexOf("SL") >= 0 ? "var(--sell)" : "var(--buy)");
+      info.innerHTML =
+        '<div class="ind-head"><span class="ind-chip ' + (buy ? "buy" : "sell") + '">' + (buy ? "▲ BULLISH · BUY" : "▼ BEARISH · SELL") + '</span>' +
+        '<span style="color:var(--muted)">Setup ' + indFmtIST(L.time_unix) + ' IST · <b style="color:' + stColor + '">' + st + '</b></span></div>' +
+        '<div class="ind-grid">' +
+        '<div class="ind-cell"><div class="v">' + L.entry.toFixed(2) + '</div><div class="l">Entry</div></div>' +
+        '<div class="ind-cell"><div class="v" style="color:var(--sell)">' + L.sl.toFixed(2) + '</div><div class="l">SL</div></div>' +
+        '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + L.tp1.toFixed(2) + '</div><div class="l">TP1</div></div>' +
+        '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + L.tp2.toFixed(2) + '</div><div class="l">TP2</div></div>' +
+        '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + L.tp3.toFixed(2) + '</div><div class="l">TP3</div></div>' +
+        '</div><div style="margin-top:8px;color:var(--muted);font-size:11px">Last price ' + Number(data.price).toFixed(2) + ' · chart refreshes about every 5 minutes</div>';
+    } else {
+      info.innerHTML = '<div class="ind-head"><span class="ind-chip neutral">No setup in the loaded window</span></div><div style="color:var(--muted);font-size:11px">Last price ' + Number(data.price).toFixed(2) + '</div>';
+    }
+  } catch (e) {
+    info.textContent = "Could not load indicator data. It will retry automatically.";
+  }
+}
+
 function selectChart(which) {
   localStorage.setItem("chartChoice", which);
   closeChooser();
+  document.getElementById("tvCard").style.display = which === "tv" ? "" : "none";
+  document.getElementById("setupsCard").style.display = which === "setups" ? "" : "none";
+  document.getElementById("indCard").style.display = which === "ind" ? "" : "none";
   if (which === "tv") {
-    document.getElementById("tvCard").style.display = "";
-    document.getElementById("setupsCard").style.display = "none";
     document.getElementById("tvSymbolSelect").value = currentTVSymbol;
     const label = currentTVSymbol.replace("FOREXCOM:", "");
     document.getElementById("tvChartTitle").textContent = label === "XAUUSD" ? "XAUUSD" : label.slice(0,3) + "/" + label.slice(3);
     initTVWidget(document.documentElement.getAttribute("data-theme") || "dark");
+  } else if (which === "ind") {
+    initIndChart();
   } else {
-    document.getElementById("tvCard").style.display = "none";
-    document.getElementById("setupsCard").style.display = "";
     initSetupsChart();
   }
 }
@@ -961,7 +1128,8 @@ async function enablePush() {
   refreshSettingsPanel();
 }
 
-const savedChoice = localStorage.getItem("chartChoice");
+let savedChoice = localStorage.getItem("chartChoice");
+if (!localStorage.getItem("indDefaultV1")) { savedChoice = "ind"; localStorage.setItem("indDefaultV1", "1"); }
 if (savedChoice) {
   selectChart(savedChoice);
 } else {
@@ -1992,6 +2160,93 @@ def candles():
     return Response(json.dumps({"bars": bars}), mimetype="application/json")
 
 
+_ind_raw = {"ts": 0, "b15": None, "b1": None}
+
+
+def _ind_store(b15, b1):
+    _ind_raw["ts"] = _time_mod.time()
+    _ind_raw["b15"] = b15
+    _ind_raw["b1"] = b1
+
+
+def _ev_dict(e):
+    return {"signal": e["signal"], "kind": e["kind"], "time_unix": e["time_unix"],
+            "entry": round(e["entry"], 2), "sl": round(e["sl"], 2),
+            "tp1": round(e["tp1"], 2), "tp2": round(e["tp2"], 2), "tp3": round(e["tp3"], 2)}
+
+
+def _setup_status(ev, bars1):
+    sign = 1 if ev["signal"] == "BUY" else -1
+    best = 0
+    for b in bars1:
+        if b["time"] <= ev["time_unix"]:
+            continue
+        hit_sl = (b["low"] <= ev["sl"]) if sign == 1 else (b["high"] >= ev["sl"])
+        if hit_sl:
+            return "Stopped out (SL hit)" if best == 0 else "TP%d hit" % best
+        for n, key in ((3, "tp3"), (2, "tp2"), (1, "tp1")):
+            reached = (b["high"] >= ev[key]) if sign == 1 else (b["low"] <= ev[key])
+            if reached:
+                best = max(best, n)
+                break
+        if best == 3:
+            return "TP3 hit"
+    return ("TP%d hit" % best) if best else "Active"
+
+
+@app.route("/indicator-data", methods=["GET"])
+def indicator_data():
+    age = _time_mod.time() - _ind_raw["ts"]
+    if _ind_raw["b15"] is None or (age > 420 and not market_is_closed()):
+        nb15 = fetch_ohlc(interval="15min", outputsize=300)
+        nb1 = fetch_ohlc(interval="1min", outputsize=1500)
+        if nb15 and nb1:
+            _ind_store(nb15, nb1)
+        elif _ind_raw["b15"] is None:
+            return Response(json.dumps({"error": "Could not fetch candles"}), status=502, mimetype="application/json")
+    bars15, bars1 = _ind_raw["b15"], _ind_raw["b1"]
+    det15 = drop_unfinished_bar(bars15, 900)
+    det1 = drop_unfinished_bar(bars1, 60)
+    events = detect_events_dual_tf(det15, det1)
+    t0 = bars15[0]["time"]
+    pivots = find_pivots_15m(det15, SWING_LEN)
+
+    def level_series(idx):
+        pts = []
+        carry = None
+        for t, ph, pl in pivots:
+            v = (ph, pl)[idx]
+            if v is None:
+                continue
+            if t < t0:
+                carry = v
+            else:
+                pts.append({"time": t, "value": v})
+        if carry is not None and (not pts or pts[0]["time"] > t0):
+            pts.insert(0, {"time": t0, "value": carry})
+        if pts and pts[-1]["time"] < bars15[-1]["time"]:
+            pts.append({"time": bars15[-1]["time"], "value": pts[-1]["value"]})
+        return pts
+
+    sigs = [e for e in events if e["kind"] == "signal"]
+    latest = None
+    if sigs:
+        latest = _ev_dict(sigs[-1])
+        latest["status"] = _setup_status(sigs[-1], det1)
+    body = {
+        "bars": bars15,
+        "struct_high": level_series(0),
+        "struct_low": level_series(1),
+        "events": [_ev_dict(e) for e in events if e["time_unix"] >= t0],
+        "latest": latest,
+        "price": bars1[-1]["close"],
+        "last_candle": bars1[-1]["time"],
+        "updated": int(_ind_raw["ts"]),
+        "market_closed": market_is_closed(),
+    }
+    return Response(json.dumps(body), mimetype="application/json")
+
+
 @app.route("/stats7d", methods=["GET"])
 def stats7d():
     return Response(json.dumps(get_7day_stats()), mimetype="application/json")
@@ -2273,6 +2528,7 @@ def scan_signals():
     if not bars15 or not bars1:
         return Response(json.dumps({"error": "Could not fetch candles (Twelve Data limit or key issue)"}),
                         status=502, mimetype="application/json")
+    _ind_store(bars15, bars1)
     bars15 = drop_unfinished_bar(bars15, 900)
     bars1 = drop_unfinished_bar(bars1, 60)
 
