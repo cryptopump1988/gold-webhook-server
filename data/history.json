@@ -1,5 +1,18 @@
 [
   {
+    "symbol": "XAUUSD",
+    "signal": "BUY",
+    "kind": "signal",
+    "entry": "4000.00",
+    "sl": "3990.00",
+    "tp1": "4010.00",
+    "tp2": "4020.00",
+    "tp3": "4030.00",
+    "chart_url": "",
+    "time": "08 Oct 2026, 19:06 UTC",
+    "time_unix": 1791486385
+  },
+  {
     "symbol": "TEST",
     "signal": "SELL",
     "kind": "touch",
