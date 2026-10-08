@@ -559,6 +559,9 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 .empty .emoji { font-size:42px; margin-bottom:14px; }
 .section-title { padding:10px 16px 0; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.6px; font-weight:700; }
 .ind-upd { font-size:11px; color:var(--muted); }
+.ind-tf { display:flex; gap:6px; padding:8px 14px 0; }
+.ind-tf button { background:var(--card2); color:var(--muted); border:1px solid var(--border); border-radius:8px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.ind-tf button.active { background:var(--accent); color:#111; border-color:var(--accent); }
 .ind-legend { display:flex; flex-wrap:wrap; gap:10px 14px; padding:8px 14px 0; font-size:11px; color:var(--muted); }
 .ind-legend i { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; margin-right:5px; }
 .ind-info { padding:10px 14px 14px; font-size:13px; }
@@ -693,6 +696,13 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
     <h2><span class="live-dot"></span>XAUUSD Gold Indicator</h2>
     <span class="ind-upd" id="indUpdated"></span>
   </div>
+  <div class="ind-tf" id="indTFBar">
+    <button data-tf="1" onclick="setIndTF('1')">1m</button>
+    <button data-tf="5" onclick="setIndTF('5')">5m</button>
+    <button data-tf="15" onclick="setIndTF('15')">15m</button>
+    <button data-tf="60" onclick="setIndTF('60')">1H</button>
+    <button data-tf="240" onclick="setIndTF('240')">4H</button>
+  </div>
   <div id="indChartContainer" style="height:420px; position:relative;"></div>
   <div class="ind-legend">
     <span><i style="border-color:#ff9800"></i>Swing High</span>
@@ -826,6 +836,17 @@ let setupsChartBuilt = false;
 
 // ============= GOLD INDICATOR CHART (in-app) =============
 let indBuilt = false, indTimer = null, indChart = null, indCandles = null, indHi = null, indLo = null, indLevelSeries = [], indFirstFit = true;
+let indTF = (function() { try { return localStorage.getItem("indTF") || "15"; } catch (e) { return "15"; } })();
+function paintIndTF() {
+  document.querySelectorAll("#indTFBar button").forEach(function(b) { b.classList.toggle("active", b.getAttribute("data-tf") === indTF); });
+}
+function setIndTF(tf) {
+  indTF = tf;
+  try { localStorage.setItem("indTF", tf); } catch (e) {}
+  indFirstFit = true;
+  paintIndTF();
+  loadIndData();
+}
 const IND_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function indPad(n) { return n < 10 ? "0" + n : "" + n; }
 function indFmtIST(ts) {
@@ -888,7 +909,8 @@ function startIndTimer() {
 async function loadIndData() {
   const info = document.getElementById("indInfo");
   try {
-    const res = await fetch("/indicator-data");
+    paintIndTF();
+    const res = await fetch("/indicator-data?tf=" + indTF);
     const data = await res.json();
     const bars = data.bars || [];
     if (!bars.length) { info.textContent = "No candle data yet (" + (data.error || "waiting for first update") + ")."; return; }
@@ -896,10 +918,11 @@ async function loadIndData() {
     indHi.setData(data.struct_high || []);
     indLo.setData(data.struct_low || []);
     const firstT = bars[0].time, lastT = bars[bars.length - 1].time;
+    const per = data.period || 900;
 
     const markers = [];
     (data.events || []).forEach(function(ev) {
-      const t = ev.time_unix - (ev.time_unix % 900);
+      const t = ev.time_unix - (ev.time_unix % per);
       if (t < firstT) return;
       const buy = ev.signal === "BUY";
       if (ev.kind === "signal") {
@@ -915,7 +938,7 @@ async function loadIndData() {
     indLevelSeries = [];
     const L = data.latest;
     if (L) {
-      const t1 = Math.max(L.time_unix - (L.time_unix % 900), firstT);
+      const t1 = Math.max(L.time_unix - (L.time_unix % per), firstT);
       const defs = [["Entry", L.entry, "#2962ff", 0, 2], ["SL", L.sl, "#f85149", 0, 2], ["TP1", L.tp1, "#3fb950", 2, 1], ["TP2", L.tp2, "#3fb950", 2, 1], ["TP3", L.tp3, "#3fb950", 2, 1]];
       defs.forEach(function(d) {
         const s = indChart.addLineSeries({ color: d[2], lineWidth: d[4], lineStyle: d[3], priceLineVisible: false, lastValueVisible: true, title: d[0], crosshairMarkerVisible: false });
@@ -2169,6 +2192,20 @@ def _ind_store(b15, b1):
     _ind_raw["b1"] = b1
 
 
+def _agg(bars, period):
+    out = []
+    for b in bars:
+        k = b["time"] - b["time"] % period
+        if out and out[-1]["time"] == k:
+            o = out[-1]
+            o["high"] = max(o["high"], b["high"])
+            o["low"] = min(o["low"], b["low"])
+            o["close"] = b["close"]
+        else:
+            out.append({"time": k, "open": b["open"], "high": b["high"], "low": b["low"], "close": b["close"]})
+    return out
+
+
 def _ev_dict(e):
     return {"signal": e["signal"], "kind": e["kind"], "time_unix": e["time_unix"],
             "entry": round(e["entry"], 2), "sl": round(e["sl"], 2),
@@ -2208,7 +2245,16 @@ def indicator_data():
     det15 = drop_unfinished_bar(bars15, 900)
     det1 = drop_unfinished_bar(bars1, 60)
     events = detect_events_dual_tf(det15, det1)
-    t0 = bars15[0]["time"]
+    period = {"1": 60, "5": 300, "15": 900, "60": 3600, "240": 14400}.get(request.args.get("tf", "15"), 900)
+    if period == 60:
+        disp = bars1
+    elif period == 300:
+        disp = _agg(bars1, 300)
+    elif period == 900:
+        disp = bars15
+    else:
+        disp = _agg(bars15, period)
+    t0 = disp[0]["time"]
     pivots = find_pivots_15m(det15, SWING_LEN)
 
     def level_series(idx):
@@ -2218,14 +2264,17 @@ def indicator_data():
             v = (ph, pl)[idx]
             if v is None:
                 continue
-            if t < t0:
+            st = t - t % period
+            if st < t0:
                 carry = v
+            elif pts and pts[-1]["time"] == st:
+                pts[-1]["value"] = v
             else:
-                pts.append({"time": t, "value": v})
+                pts.append({"time": st, "value": v})
         if carry is not None and (not pts or pts[0]["time"] > t0):
             pts.insert(0, {"time": t0, "value": carry})
-        if pts and pts[-1]["time"] < bars15[-1]["time"]:
-            pts.append({"time": bars15[-1]["time"], "value": pts[-1]["value"]})
+        if pts and pts[-1]["time"] < disp[-1]["time"]:
+            pts.append({"time": disp[-1]["time"], "value": pts[-1]["value"]})
         return pts
 
     sigs = [e for e in events if e["kind"] == "signal"]
@@ -2234,7 +2283,8 @@ def indicator_data():
         latest = _ev_dict(sigs[-1])
         latest["status"] = _setup_status(sigs[-1], det1)
     body = {
-        "bars": bars15,
+        "bars": disp,
+        "period": period,
         "struct_high": level_series(0),
         "struct_low": level_series(1),
         "events": [_ev_dict(e) for e in events if e["time_unix"] >= t0],
