@@ -2992,6 +2992,16 @@ def latest():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # --- shared-secret check: set WEBHOOK_SECRET in Render; send it as ?token=..., header X-Webhook-Token, or "token" in the JSON body ---
+    import hmac
+    secret = os.environ.get("WEBHOOK_SECRET", "")
+    if not secret:
+        return "Webhook disabled: WEBHOOK_SECRET not configured", 503
+    _body = request.get_json(silent=True)
+    _given = (request.args.get("token") or request.headers.get("X-Webhook-Token")
+              or (_body.get("token") if isinstance(_body, dict) else "") or "")
+    if not hmac.compare_digest(str(_given).encode(), secret.encode()):
+        return "Unauthorized", 401
     raw = request.get_data(as_text=True).strip()
 
     if not raw:
