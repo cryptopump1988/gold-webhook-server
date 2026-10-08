@@ -120,7 +120,9 @@ def send_push_to_all(title, body_text, url_path="/"):
                 subscription_info=sub,
                 data=payload,
                 vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims={"sub": VAPID_CLAIMS_EMAIL}
+                vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
+                ttl=900,
+                headers={"Urgency": "high"}
             )
             still_valid.append(sub)
         except WebPushException as e:
