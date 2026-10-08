@@ -17,7 +17,12 @@ HISTORY_PATH = "data/history.json"
 SUBS_PATH = "data/subscriptions.json"
 MAX_HISTORY = 100
 
-VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+# Accept the key as a one-line base64 string OR as a pasted PEM block (header/footer + line breaks);
+# pywebpush only understands the one-line form, so a PEM paste fails with "ASN.1 parsing error".
+_vapid_raw = os.environ.get("VAPID_PRIVATE_KEY", "").strip().replace("\\n", "\n")
+if "BEGIN" in _vapid_raw:
+    _vapid_raw = "".join(l.strip() for l in _vapid_raw.splitlines() if l.strip() and not l.strip().startswith("-----"))
+VAPID_PRIVATE_KEY = _vapid_raw
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
 VAPID_CLAIMS_EMAIL = os.environ.get("VAPID_CLAIMS_EMAIL", "mailto:admin@bakalestrading.app")
 
