@@ -160,7 +160,7 @@ def fetch_ohlc(symbol="XAU/USD", interval="15min", outputsize=700):
     if not TWELVE_DATA_KEY:
         return None
     url = "https://api.twelvedata.com/time_series"
-    params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": TWELVE_DATA_KEY, "format": "JSON"}
+    params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": TWELVE_DATA_KEY, "format": "JSON", "timezone": "UTC"}
     try:
         r = requests.get(url, params=params, timeout=25)
         data = r.json()
