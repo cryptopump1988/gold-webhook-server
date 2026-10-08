@@ -439,6 +439,8 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 }
 .ticker-item .tsym { font-weight:800; color:#39ff14; text-shadow: 0 0 6px rgba(57,255,20,0.95), 0 0 14px rgba(57,255,20,0.6); }
 .ticker-item .tprice { color:#39ff14; text-shadow: 0 0 5px rgba(57,255,20,0.8); font-weight:600; }
+.ticker-strip.forex .ticker-item .tsym { color:#ffcc00; text-shadow: 0 0 6px rgba(255,204,0,0.95), 0 0 14px rgba(255,204,0,0.6); }
+.ticker-strip.forex .ticker-item .tprice { color:#ffcc00; text-shadow: 0 0 5px rgba(255,204,0,0.8); }
 .ticker-item .tchange.up { color:#26a69a; font-weight:600; }
 .ticker-item .tchange.down { color:#ef5350; font-weight:600; }
 .ticker-item .tgainer-tag {
@@ -511,12 +513,7 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
   margin:14px 16px 4px; background:var(--card); border:1px solid var(--border); border-radius:16px;
   overflow:hidden; box-shadow: var(--shadow);
 }
-.chart-embed-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px; }
-.tv-note { padding:8px 16px; font-size:11px; line-height:1.4; color:var(--muted); border-bottom:1px solid var(--border); }
-.tv-open-btn {
-  background:var(--accent); color:#161b22; border:none; border-radius:8px; padding:7px 12px;
-  font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;
-}
+.chart-embed-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
 .chart-embed-header h2 { font-size:14px; margin:0; font-weight:700; }
 .chart-embed-header .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--buy); margin-right:6px; animation: pulse 1.5s infinite; }
 .symbol-select {
@@ -574,6 +571,12 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 <div class="ticker-strip" id="tickerStrip">
   <div class="ticker-track" id="tickerTrack">
     <span class="ticker-loading">Loading market data…</span>
+  </div>
+</div>
+
+<div class="ticker-strip forex" id="forexTickerStrip">
+  <div class="ticker-track" id="forexTickerTrack">
+    <span class="ticker-loading">Loading forex data…</span>
   </div>
 </div>
 
@@ -642,9 +645,7 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
       <option value="FOREXCOM:USDCAD">USD/CAD</option>
       <option value="FOREXCOM:NZDUSD">NZD/USD</option>
     </select>
-    <button class="tv-open-btn" id="openTVBtn" onclick="openInTradingView()">↗ Open in TradingView</button>
   </div>
-  <div class="tv-note">Add your CHoCH indicator on TradingView directly: tap "Open in TradingView" above, then Indicators → My Scripts → your script. Use the resolution buttons (1m / 30m / 1h ...) right below the chart to change timeframe — that's TradingView's own control, already built in.</div>
   <div id="tvChartContainer"></div>
 </div>
 
@@ -698,7 +699,6 @@ function toggleTheme() {
 
 let tvScriptLoaded = false;
 let currentTVSymbol = localStorage.getItem("tvSymbol") || "FOREXCOM:XAUUSD";
-const DEFAULT_TV_INTERVAL = "15";
 
 function changeTVSymbol(symbol) {
   currentTVSymbol = symbol;
@@ -709,16 +709,6 @@ function changeTVSymbol(symbol) {
   initTVWidget(theme);
 }
 
-function openInTradingView() {
-  // Deep-link to TradingView with the current symbol pre-loaded.
-  // NOTE: TradingView does not allow any outside app to auto-apply an
-  // indicator to the chart -- you still add it manually once there via
-  // Indicators -> My Scripts. This is a TradingView platform limit, not
-  // something this app can bypass, even for public/published scripts.
-  const url = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(currentTVSymbol) + "&interval=" + DEFAULT_TV_INTERVAL;
-  window.open(url, "_blank");
-}
-
 function initTVWidget(theme) {
   const container = document.getElementById("tvChartContainer");
   container.innerHTML = "";
@@ -726,7 +716,7 @@ function initTVWidget(theme) {
     new TradingView.widget({
       "autosize": true,
       "symbol": currentTVSymbol,
-      "interval": DEFAULT_TV_INTERVAL,
+      "interval": "15",
       "timezone": "Etc/UTC",
       "theme": theme === "light" ? "light" : "dark",
       "style": "1",
@@ -1109,10 +1099,7 @@ async function loadTicker() {
     const res = await fetch("/crypto-ticker");
     const data = await res.json();
     const coins = data.coins || [];
-    if (coins.length === 0) {
-      document.getElementById("tickerTrack").innerHTML = '<span class="ticker-loading">Market data unavailable — check /debug-crypto</span>';
-      return;
-    }
+    if (coins.length === 0) return;
     const itemHtml = (c) => {
       const dir = c.change_pct >= 0 ? "up" : "down";
       const arrow = c.change_pct >= 0 ? "▲" : "▼";
@@ -1125,15 +1112,37 @@ async function loadTicker() {
     const html = coins.map(itemHtml).join("") + coins.map(itemHtml).join("");
     document.getElementById("tickerTrack").innerHTML = html;
   } catch (e) {
-    document.getElementById("tickerTrack").innerHTML = '<span class="ticker-loading">Market data unavailable — check /debug-crypto</span>';
+    // leave existing ticker content in place on a transient failure
+  }
+}
+
+async function loadForexTicker() {
+  try {
+    const res = await fetch("/forex-ticker");
+    const data = await res.json();
+    const pairs = data.pairs || [];
+    if (pairs.length === 0) return;
+    const itemHtml = (p) => {
+      const dir = p.change_pct >= 0 ? "up" : "down";
+      const arrow = p.change_pct >= 0 ? "▲" : "▼";
+      const decimals = p.price >= 10 ? 3 : 5;
+      const priceStr = p.price.toFixed(decimals);
+      return `<span class="ticker-item"><span class="tsym">${p.symbol}</span><span class="tprice">${priceStr}</span><span class="tchange ${dir}">${arrow} ${Math.abs(p.change_pct).toFixed(2)}%</span></span>`;
+    };
+    const html = pairs.map(itemHtml).join("") + pairs.map(itemHtml).join("");
+    document.getElementById("forexTickerTrack").innerHTML = html;
+  } catch (e) {
+    // leave existing ticker content in place on a transient failure
   }
 }
 
 load();
 loadTicker();
+loadForexTicker();
 loadWeekStats();
 setInterval(load, 20000);
 setInterval(loadTicker, 120000);
+setInterval(loadForexTicker, 600000);
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
@@ -1773,27 +1782,6 @@ def _fetch_coingecko_markets(**params):
     return r.json()
 
 
-@app.route("/debug-push", methods=["GET"])
-def debug_push():
-    result = {
-        "vapid_private_key_present": bool(VAPID_PRIVATE_KEY),
-        "vapid_public_key_present": bool(VAPID_PUBLIC_KEY),
-    }
-    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
-        result["problem"] = "VAPID_PRIVATE_KEY or VAPID_PUBLIC_KEY missing on Render. Push will silently no-op until both are set."
-        return Response(json.dumps(result, indent=2), mimetype="application/json")
-    try:
-        subs, _ = gh_load_json(SUBS_PATH)
-        result["subscription_count"] = len(subs) if subs else 0
-        if not subs:
-            result["problem"] = "No push subscriptions saved yet. Tap the bell icon in the app, allow notifications, then reload this page."
-        else:
-            result["endpoints"] = [s.get("endpoint", "")[:60] + "..." for s in subs]
-    except Exception as e:
-        result["problem"] = "Failed to read subscriptions file: " + repr(e)
-    return Response(json.dumps(result, indent=2), mimetype="application/json")
-
-
 @app.route("/debug-crypto", methods=["GET"])
 def debug_crypto():
     result = {}
@@ -1818,6 +1806,52 @@ def debug_crypto():
         result["coingecko_error"] = repr(e)
     return Response(json.dumps(result, indent=2, default=str), mimetype="application/json")
 
+
+FOREX_MAJOR_PAIRS = ["EUR/USD", "USD/JPY", "GBP/USD", "USD/CHF", "AUD/USD", "USD/CAD", "NZD/USD"]
+_forex_ticker_cache = {"data": None, "ts": 0}
+FOREX_TICKER_CACHE_TTL = 3600  # 1 hour - forex ticker is a bonus display, not a trading signal;
+                                 # keeps worst-case usage around 168 credits/day (7 pairs x 24 refreshes)
+
+
+def fetch_forex_ticker_via_twelvedata():
+    import time as _time
+    if not TWELVE_DATA_KEY:
+        return []
+    results = []
+    for i, pair in enumerate(FOREX_MAJOR_PAIRS):
+        if i > 0:
+            _time.sleep(0.12)
+        try:
+            r = requests.get("https://api.twelvedata.com/quote",
+                              params={"symbol": pair, "apikey": TWELVE_DATA_KEY}, timeout=15)
+            d = r.json()
+            if "close" not in d or "percent_change" not in d:
+                print("Twelve Data forex quote missing fields for", pair, ":", d)
+                continue
+            results.append({
+                "symbol": pair, "price": float(d["close"]),
+                "change_pct": float(d["percent_change"]), "type": "forex"
+            })
+        except Exception as e:
+            print("Twelve Data forex quote failed for", pair, ":", repr(e))
+            continue
+    return results
+
+
+@app.route("/forex-ticker", methods=["GET"])
+def forex_ticker():
+    import time as _time
+    now = _time.time()
+    if _forex_ticker_cache["data"] is not None and (now - _forex_ticker_cache["ts"]) < FOREX_TICKER_CACHE_TTL:
+        return Response(json.dumps({"pairs": _forex_ticker_cache["data"]}), mimetype="application/json")
+    results = fetch_forex_ticker_via_twelvedata()
+    if results:
+        _forex_ticker_cache["data"] = results
+        _forex_ticker_cache["ts"] = now
+        return Response(json.dumps({"pairs": results}), mimetype="application/json")
+    if _forex_ticker_cache["data"] is not None:
+        return Response(json.dumps({"pairs": _forex_ticker_cache["data"], "stale": True}), mimetype="application/json")
+    return Response(json.dumps({"pairs": []}), mimetype="application/json")
 
 
 @app.route("/crypto-ticker", methods=["GET"])
@@ -2028,6 +2062,249 @@ def webhook():
         print("Push notification failed:", e)
 
     return "OK", 200
+
+
+# ======================================================================
+# SERVER-SIDE SIGNAL SCANNER (replaces TradingView webhooks)
+# cron-job.org calls /scan-signals every few minutes. The server pulls
+# fresh 15M + 1M gold candles, runs the same CHoCH logic as the Pine
+# indicator, and sends Telegram + push + app history for anything new.
+# ======================================================================
+import time as _time_mod
+
+SCAN_RECENT_SIGNAL_SEC = 25 * 60   # only alert on setups formed in the last 25 min
+SCAN_RECENT_TOUCH_SEC = 12 * 60    # zone re-touches: last 12 min only
+ZONE_REARM_MULT = 0.15
+
+
+def market_is_closed(now=None):
+    """Gold (spot) is closed from Friday ~22:00 UTC to Sunday ~22:00 UTC."""
+    now = now or datetime.utcnow()
+    wd = now.weekday()  # Mon=0 ... Sun=6
+    if wd == 5:
+        return True
+    if wd == 4 and now.hour >= 22:
+        return True
+    if wd == 6 and now.hour < 22:
+        return True
+    return False
+
+
+def drop_unfinished_bar(bars, seconds):
+    """Remove the still-forming last candle so signals fire on CLOSED candles only."""
+    if not bars:
+        return bars
+    now_ts = _time_mod.time()
+    if bars[-1]["time"] + seconds > now_ts:
+        return bars[:-1]
+    return bars
+
+
+def detect_events_dual_tf(bars15, bars1):
+    """Same as detect_choch_signals_dual_tf, plus the indicator's repeatable
+    'zone re-touch' alerts. Returns a list of events sorted by time:
+    {kind: 'signal'|'touch', signal, time_unix, entry, sl, tp1, tp2, tp3}"""
+    if len(bars15) < (SWING_LEN * 2 + 2) or len(bars1) < ATR_LEN + 2:
+        return []
+
+    pivot_events = find_pivots_15m(bars15, SWING_LEN)
+    atr1 = compute_atr(bars1, ATR_LEN)
+
+    struct_high = None
+    struct_low = None
+    trend = 0
+    pivot_idx = 0
+    n_pivots = len(pivot_events)
+    events = []
+
+    cur = None  # current setup dict
+    long_watch = short_watch = False
+    away_buy = away_sell = True
+
+    for i in range(1, len(bars1)):
+        b = bars1[i]
+        t = b["time"]
+        while pivot_idx < n_pivots and pivot_events[pivot_idx][0] <= t:
+            _, ph, pl = pivot_events[pivot_idx]
+            if ph is not None:
+                struct_high = ph
+            if pl is not None:
+                struct_low = pl
+            pivot_idx += 1
+
+        if atr1[i] is None or struct_high is None or struct_low is None:
+            continue
+
+        close = b["close"]
+        prev_close = bars1[i - 1]["close"]
+        atr = atr1[i]
+
+        bull = (trend != 1) and (prev_close <= struct_high) and (close > struct_high)
+        bear = (trend != -1) and (prev_close >= struct_low) and (close < struct_low)
+
+        if bull or bear:
+            if bull:
+                trend = 1
+                sl = struct_low - atr * SL_BUFFER_MULT
+                sign = 1
+                name = "BUY"
+            else:
+                trend = -1
+                sl = struct_high + atr * SL_BUFFER_MULT
+                sign = -1
+                name = "SELL"
+            entry = close
+            risk = abs(entry - sl)
+            cur = {"signal": name, "entry": entry, "sl": sl,
+                   "tp1": entry + sign * risk * RR[0],
+                   "tp2": entry + sign * risk * RR[1],
+                   "tp3": entry + sign * risk * RR[2]}
+            events.append(dict(cur, kind="signal", time_unix=t))
+            long_watch = bull
+            short_watch = bear
+            away_buy = away_sell = True
+            continue  # no zone-touch on the signal candle itself
+
+        if cur is None:
+            continue
+
+        if long_watch and (b["low"] <= cur["sl"] or b["high"] >= cur["tp3"]):
+            long_watch = False
+        if short_watch and (b["high"] >= cur["sl"] or b["low"] <= cur["tp3"]):
+            short_watch = False
+
+        if long_watch and away_buy and b["low"] <= cur["entry"]:
+            away_buy = False
+            events.append(dict(cur, kind="touch", time_unix=t))
+        if short_watch and away_sell and b["high"] >= cur["entry"]:
+            away_sell = False
+            events.append(dict(cur, kind="touch", time_unix=t))
+
+        if long_watch and not away_buy and close > cur["entry"] + atr * ZONE_REARM_MULT:
+            away_buy = True
+        if short_watch and not away_sell and close < cur["entry"] - atr * ZONE_REARM_MULT:
+            away_sell = True
+
+    events.sort(key=lambda e: e["time_unix"])
+    return events
+
+
+def deliver_alert(ev, bars15):
+    """Telegram (chart photo, text fallback) + push + history. Returns True if saved."""
+    f = lambda v: "{:.2f}".format(v)
+    symbol, signal, kind = "XAUUSD", ev["signal"], ev["kind"]
+    entry, sl, tp1, tp2, tp3 = f(ev["entry"]), f(ev["sl"]), f(ev["tp1"]), f(ev["tp2"]), f(ev["tp3"])
+    caption = build_caption(symbol, signal, kind, entry, sl, tp1, tp2, tp3)
+
+    chart_sent = False
+    chart_url_for_app = ""
+    try:
+        closes = [b["close"] for b in bars15[-120:]]
+        if len(closes) > 10:
+            config = build_chart_config(closes, ev["entry"], ev["sl"], ev["tp1"], ev["tp2"], ev["tp3"], signal)
+            png = render_chart_png_bytes(config)
+            r = send_photo_bytes(png, caption)
+            chart_sent = r.status_code == 200
+            if not chart_sent:
+                print("Scan: Telegram photo failed:", r.status_code, r.text[:200])
+            chart_url_for_app = ("/chart-image?signal=" + signal + "&entry=" + entry + "&sl=" + sl +
+                                 "&tp1=" + tp1 + "&tp2=" + tp2 + "&tp3=" + tp3)
+    except Exception as e:
+        print("Scan: chart failed:", repr(e))
+    if not chart_sent:
+        try:
+            send_text(caption)
+        except Exception as e:
+            print("Scan: Telegram text failed:", repr(e))
+
+    new_entry = {
+        "symbol": symbol, "signal": signal, "kind": kind,
+        "entry": entry, "sl": sl, "tp1": tp1, "tp2": tp2, "tp3": tp3,
+        "chart_url": chart_url_for_app,
+        "time": datetime.utcfromtimestamp(ev["time_unix"]).strftime("%d %b %Y, %H:%M UTC"),
+        "time_unix": ev["time_unix"]
+    }
+    saved = False
+    try:
+        history, sha = gh_load_history()
+        history.insert(0, new_entry)
+        history.sort(key=lambda x: x.get("time_unix", 0), reverse=True)
+        saved = gh_save_history(history[:MAX_HISTORY], sha)
+    except Exception as e:
+        print("Scan: history save failed:", repr(e))
+
+    try:
+        dot = "🟢" if signal == "BUY" else "🔴"
+        title = dot + " " + signal + (" Setup" if kind == "signal" else " Zone Touched Again")
+        send_push_to_all(title, "Entry " + entry + " | SL " + sl + " | TP1 " + tp1, "/")
+    except Exception as e:
+        print("Scan: push failed:", repr(e))
+    return saved
+
+
+@app.route("/scan-signals", methods=["GET"])
+def scan_signals():
+    force = request.args.get("force") == "1"
+    dry = request.args.get("dry") == "1"
+    if market_is_closed() and not force:
+        return Response(json.dumps({"status": "market closed - skipped, no credits used"}), mimetype="application/json")
+    if not BOT_TOKEN or not CHAT_ID:
+        return Response(json.dumps({"error": "Telegram variables missing"}), status=500, mimetype="application/json")
+
+    bars15 = fetch_ohlc(interval="15min", outputsize=300)
+    bars1 = fetch_ohlc(interval="1min", outputsize=1500)
+    if not bars15 or not bars1:
+        return Response(json.dumps({"error": "Could not fetch candles (Twelve Data limit or key issue)"}),
+                        status=502, mimetype="application/json")
+    bars15 = drop_unfinished_bar(bars15, 900)
+    bars1 = drop_unfinished_bar(bars1, 60)
+
+    events = detect_events_dual_tf(bars15, bars1)
+    now_ts = _time_mod.time()
+    fresh = []
+    for ev in events:
+        age = now_ts - ev["time_unix"]
+        limit = SCAN_RECENT_SIGNAL_SEC if ev["kind"] == "signal" else SCAN_RECENT_TOUCH_SEC
+        if 0 <= age <= limit or force:
+            fresh.append(ev)
+    if not force:
+        fresh = [e for e in fresh if (now_ts - e["time_unix"]) <= (SCAN_RECENT_SIGNAL_SEC if e["kind"] == "signal" else SCAN_RECENT_TOUCH_SEC)]
+    else:
+        fresh = fresh[-1:]  # force: only the single latest event, for testing
+
+    try:
+        history, _ = gh_load_history()
+    except Exception:
+        history = []
+    seen = set((h.get("signal"), h.get("kind"), h.get("time_unix")) for h in history)
+
+    def near_duplicate(ev):
+        # an older TradingView-webhook entry for the same setup (time differs by seconds/minutes)
+        for h in history:
+            if h.get("signal") == ev["signal"] and h.get("kind") == ev["kind"]:
+                try:
+                    if abs(int(h.get("time_unix", 0)) - ev["time_unix"]) <= 300:
+                        return True
+                except Exception:
+                    pass
+        return False
+
+    new_events = [e for e in fresh if (e["signal"], e["kind"], e["time_unix"]) not in seen and not near_duplicate(e)]
+    if force:
+        new_events = fresh  # test mode resends even if already seen
+
+    sent = 0
+    if not dry:
+        for ev in new_events:
+            deliver_alert(ev, bars15)
+            sent += 1
+
+    return Response(json.dumps({
+        "status": "ok", "bars": {"15m": len(bars15), "1m": len(bars1)},
+        "last_candle_utc": datetime.utcfromtimestamp(bars1[-1]["time"]).strftime("%d %b %H:%M"),
+        "events_in_window": len(events), "fresh": len(fresh), "new_alerts_sent": sent,
+        "dry_run": dry
+    }), mimetype="application/json")
 
 
 if __name__ == "__main__":
