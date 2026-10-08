@@ -574,6 +574,72 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
 .ind-cell { background:var(--card2); border-radius:8px; padding:6px 4px; text-align:center; }
 .ind-cell .v { font-weight:700; font-size:12px; }
 .ind-cell .l { font-size:10px; color:var(--muted); margin-top:2px; }
+body { padding-bottom: 86px; }
+.tabpane { display:none; }
+.tabpane.active { display:block; }
+.price-pill { display:flex; align-items:center; gap:6px; background:var(--card2); border:1px solid var(--border); border-radius:20px; padding:5px 11px; font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; cursor:pointer; }
+.price-pill .pp-dot { width:7px; height:7px; border-radius:50%; background:var(--buy); animation:pulse 1.5s infinite; }
+.tabbar { position:fixed; left:0; right:0; bottom:0; z-index:30; display:flex; background:var(--card); border-top:1px solid var(--border); padding:6px 6px calc(6px + env(safe-area-inset-bottom)); box-shadow:0 -6px 20px rgba(0,0,0,0.25); }
+.tabbar button { flex:1; background:none; border:0; color:var(--muted); font-size:11px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:3px; padding:6px 0; border-radius:12px; cursor:pointer; }
+.tabbar button .ti { font-size:19px; filter:grayscale(1); opacity:0.7; }
+.tabbar button.active { color:var(--accent); background:var(--card2); }
+.tabbar button.active .ti { filter:none; opacity:1; }
+.seg { display:flex; margin:14px 16px 0; background:var(--card2); border:1px solid var(--border); border-radius:12px; padding:3px; gap:3px; }
+.seg button { flex:1; background:none; border:0; color:var(--muted); font-size:12px; font-weight:700; padding:8px 4px; border-radius:9px; cursor:pointer; }
+.seg button.active { background:var(--accent); color:#161b22; }
+.sess-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:14px 16px 0; }
+.sess-pill { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:8px 4px; text-align:center; }
+.sess-pill .sn { font-size:11px; font-weight:800; }
+.sess-pill .ss { font-size:10px; color:var(--muted); margin-top:3px; }
+.sess-pill.open { border-color:var(--buy); background:var(--buy-bg); }
+.sess-pill.open .sn::before { content:"● "; color:var(--buy); }
+.sess-note { margin:8px 16px 0; font-size:12px; color:var(--muted); text-align:center; }
+.news-banner { margin:14px 16px 0; padding:10px 14px; border-radius:12px; font-size:13px; font-weight:600; background:rgba(244,196,48,0.12); border:1px solid #f4c430; color:var(--text); }
+.news-banner.hot { background:var(--sell-bg); border-color:var(--sell); }
+.panel { margin:14px 16px 0; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px 16px; box-shadow:var(--shadow); }
+.panel h3 { margin:0 0 10px; font-size:14px; font-weight:800; }
+.panel .small, .small { font-size:11.5px; color:var(--muted); line-height:1.6; }
+.sec-head { display:flex; justify-content:space-between; align-items:center; padding:16px 18px 0; }
+.sec-head h2 { margin:0; font-size:18px; }
+.chips-row { display:flex; gap:8px; padding:12px 16px 0; overflow-x:auto; }
+.hero { margin:14px 16px 0; padding:18px 16px; border-radius:16px; border:1px solid var(--border); background:linear-gradient(135deg,var(--card),var(--card2)); text-align:center; box-shadow:var(--shadow); }
+.hero .hn { font-size:38px; font-weight:900; font-variant-numeric:tabular-nums; }
+.hero .hl { font-size:12px; color:var(--muted); margin-top:2px; }
+.hero .hs { font-size:12px; margin-top:10px; color:var(--muted); }
+.pos { color:var(--buy); } .neg { color:var(--sell); } .neu { color:var(--muted); }
+.kgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 16px 0; }
+.kcell { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:10px 2px; text-align:center; }
+.kcell .kv { font-size:19px; font-weight:800; }
+.kcell .kl { font-size:10px; color:var(--muted); margin-top:3px; padding:0 2px; }
+.drow { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.drow:last-child { border-bottom:0; }
+.drow span:first-child { color:var(--muted); }
+.drow b { font-variant-numeric:tabular-nums; }
+.logrow { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--border); }
+.logrow:last-child { border-bottom:0; }
+.logrow .lt { font-size:11px; color:var(--muted); margin-top:3px; }
+.rchip { display:inline-block; padding:3px 9px; border-radius:8px; font-size:11px; font-weight:800; }
+.rchip.win { background:var(--buy-bg); color:var(--buy); }
+.rchip.loss { background:var(--sell-bg); color:var(--sell); }
+.rchip.open { background:rgba(212,175,55,0.15); color:var(--accent); }
+.rchip.mixed { background:var(--card2); color:var(--muted); }
+.fld { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
+.fld label { color:var(--muted); }
+.fld input { width:120px; background:var(--card2); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font-size:14px; text-align:right; }
+.btn { width:100%; background:var(--accent); color:#161b22; border:0; border-radius:10px; padding:10px; font-weight:800; font-size:13px; cursor:pointer; margin:4px 0 10px; }
+.btn.alt { background:var(--card2); color:var(--text); border:1px solid var(--border); }
+.cout { background:var(--card2); border-radius:12px; padding:10px 12px; font-size:13px; }
+.plan-bar { position:relative; height:10px; border-radius:6px; margin:16px 0 22px; background:linear-gradient(90deg,var(--sell-bg),var(--card2) 33%,var(--buy-bg)); border:1px solid var(--border); }
+.plan-bar .tick { position:absolute; top:-3px; width:2px; height:14px; background:var(--muted); }
+.plan-bar .tl { position:absolute; top:14px; font-size:9px; color:var(--muted); transform:translateX(-50%); white-space:nowrap; }
+.plan-bar .you { position:absolute; top:-5px; width:6px; height:18px; border-radius:3px; background:var(--accent); transform:translateX(-50%); box-shadow:0 0 8px var(--accent); }
+.cal-item { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.cal-item:last-child { border-bottom:0; }
+.cal-item .cs { font-size:11px; color:var(--muted); margin-top:2px; }
+.cal-item .cc { font-size:12px; font-weight:800; white-space:nowrap; text-align:right; }
+.tips li { margin-bottom:7px; }
+.linkrow { display:block; padding:11px 0; border-bottom:1px solid var(--border); color:var(--text); text-decoration:none; font-size:14px; font-weight:600; }
+.linkrow:last-child { border-bottom:0; }
 </style>
 </head>
 <body>
@@ -582,15 +648,14 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
     <div class="logo">G</div>
     <div>
       <h1>Bakale's Trading</h1>
+      <div class="sub">XAUUSD · Gold</div>
     </div>
   </div>
   <div class="header-actions">
+    <div class="price-pill" id="pricePill" onclick="showTab('chart')"><span class="pp-dot"></span><span id="ppPrice">---</span></div>
     <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()"><div class="knob" id="themeKnob">🌙</div></div>
-    <button class="switch-btn" id="switchBtn" onclick="openChooser()">📊</button>
-    <button class="switch-btn" id="notifyBtn" onclick="enablePush()">🔔</button>
     <button class="switch-btn" id="settingsBtn" onclick="openSettings()">⚙️</button>
-    <button class="switch-btn" onclick="window.location.href='/history'">🕘</button>
-    <button class="switch-btn" onclick="window.location.href='/news'">📰</button>
+    <button id="notifyBtn" style="display:none"></button>
   </div>
 </div>
 
@@ -665,6 +730,15 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
   </div>
 </div>
 
+<div class="tabpane active" id="pane-chart">
+<div id="newsBanner" class="news-banner" style="display:none"></div>
+<div class="sess-strip" id="sessStrip"></div>
+<div class="sess-note" id="sessNote"></div>
+<div class="seg" id="viewSeg">
+  <button data-v="ind" onclick="selectChart('ind')">Gold Indicator</button>
+  <button data-v="tv" onclick="selectChart('tv')">TradingView</button>
+  <button data-v="setups" onclick="selectChart('setups')">Setups</button>
+</div>
 <div class="chart-embed-card" id="tvCard">
   <div class="chart-embed-header">
     <h2><span class="live-dot"></span><span id="tvChartTitle">XAUUSD</span> Live Chart</h2>
@@ -715,20 +789,93 @@ html[data-theme="light"] .theme-toggle .knob { transform: translateX(15px); }
   <div class="ind-info" id="indInfo">Loading indicator...</div>
 </div>
 
-<div class="week-panel" id="weekPanel">
-  <h2>📅 Last 7 Days</h2>
-  <div class="week-grid" id="weekGrid">
-    <div class="week-cell"><div class="num">...</div><div class="lbl">Trades</div></div>
-    <div class="week-cell sl"><div class="num">...</div><div class="lbl">Hit SL</div></div>
-    <div class="week-cell tp"><div class="num">...</div><div class="lbl">Hit TP</div></div>
-    <div class="week-cell"><div class="num">...</div><div class="lbl">Still Open</div></div>
-  </div>
-  <div class="week-note" id="weekNote"></div>
+<div class="panel" id="ctxCard" style="margin-top:14px;">
+  <h3>Key levels &amp; volatility</h3>
+  <div class="kgrid" style="margin:0;" id="ctxGrid"><div class="small" style="grid-column:1/-1">Loading...</div></div>
+  <div class="small" style="margin-top:8px">PDH/PDL = previous day high/low (UTC day). 1 pip = $0.10 on gold. ATR = average hourly range.</div>
+</div>
 </div>
 
+<div class="tabpane" id="pane-results">
+  <div class="sec-head"><h2>Performance</h2><span class="ind-upd" id="resUpdated"></span></div>
+  <div class="chips-row" id="resPeriod">
+    <div class="chip" data-p="1" onclick="setResPeriod('1')">Today</div>
+    <div class="chip" data-p="7" onclick="setResPeriod('7')">7 Days</div>
+    <div class="chip" data-p="30" onclick="setResPeriod('30')">30 Days</div>
+    <div class="chip" data-p="0" onclick="setResPeriod('0')">All Time</div>
+  </div>
+  <div class="hero" id="resHero"><div class="small">Loading real results...</div></div>
+  <div class="kgrid" id="resGrid"></div>
+  <div class="panel"><h3>Equity curve (pips)</h3><div id="resCurve"></div></div>
+  <div class="panel"><h3>Numbers</h3><div id="resRows"></div></div>
+  <div class="panel"><h3>Trade log</h3><div id="resLog"></div></div>
+  <div class="panel"><div class="small" id="resNote">
+    <b>How this is counted:</b> only real BUY/SELL setups (zone re-touch alerts and test alerts are excluded). 1 pip = $0.10 on gold.
+    Plan: one third of the position closes at each of TP1 (+1R), TP2 (+2R) and TP3 (+3R); whatever is left when price hits the original stop loss is a loss.
+    If one candle touches both the stop and a target, the stop is counted first, so results are never flattered.
+    Open trades are shown separately and are not in the totals.
+  </div></div>
+</div>
+
+<div class="tabpane" id="pane-signals">
 <div class="stats-strip" id="statsStrip"></div>
 <div class="filters" id="filters"></div>
 <div id="content"><div class="empty"><div class="emoji">⏳</div>Loading signals...</div></div>
+
+</div>
+
+<div class="tabpane" id="pane-tools">
+  <div class="sec-head"><h2>Gold Toolkit</h2></div>
+  <div class="panel">
+    <h3>Position size calculator</h3>
+    <div class="fld"><label>Account balance ($)</label><input id="cBal" type="number" inputmode="decimal" oninput="calcLots()"></div>
+    <div class="fld"><label>Risk per trade (%)</label><input id="cRisk" type="number" inputmode="decimal" oninput="calcLots()"></div>
+    <div class="fld"><label>Entry price</label><input id="cEntry" type="number" inputmode="decimal" oninput="calcLots()"></div>
+    <div class="fld"><label>Stop loss price</label><input id="cSL" type="number" inputmode="decimal" oninput="calcLots()"></div>
+    <button class="btn alt" onclick="fillFromSetup()">Use latest indicator setup</button>
+    <div class="cout" id="cOut">Enter your numbers above.</div>
+    <div class="small" style="margin-top:8px">Gold: 1 lot = 100 oz, so a $1 move = $100 per lot. Lot size = risk $ / (stop distance x 100).</div>
+  </div>
+  <div class="panel">
+    <h3>Pips to dollars</h3>
+    <div class="fld"><label>Pips</label><input id="pPips" type="number" inputmode="decimal" oninput="calcPips()"></div>
+    <div class="fld"><label>Lot size</label><input id="pLots" type="number" inputmode="decimal" oninput="calcPips()"></div>
+    <div class="cout" id="pOut">-</div>
+  </div>
+  <div class="panel">
+    <h3>High-impact news</h3>
+    <div class="chips-row" style="padding:0 0 10px;" id="calFilter">
+      <div class="chip" data-f="USD" onclick="setCalFilter('USD')">USD only</div>
+      <div class="chip" data-f="ALL" onclick="setCalFilter('ALL')">All currencies</div>
+    </div>
+    <div id="calList"><div class="small">Loading...</div></div>
+    <div class="small" style="margin-top:8px">Gold reacts hardest to US data and Fed events. Spreads widen and stops get hunted: many traders stay flat 15 minutes before and after.</div>
+  </div>
+  <div class="panel">
+    <h3>Gold trader's cheat sheet</h3>
+    <ul class="tips small" style="padding-left:18px;margin:0;">
+      <li>1 pip = $0.10 move. 10 pips = $1. Per 1.00 lot a pip is $10; per 0.01 lot it is $0.10.</li>
+      <li>Best liquidity is the London and New York overlap, roughly 17:30 to 21:30 IST. Asia session is quieter and ranges more.</li>
+      <li>Gold usually moves against the US dollar and against US real yields. A rising DXY or 10Y yield is a headwind.</li>
+      <li>Biggest movers: NFP, CPI, FOMC and Fed speakers, PCE, GDP, plus geopolitical shocks.</li>
+      <li>Risk 0.5% to 2% per trade. Size by stop distance, never by a fixed lot.</li>
+      <li>This indicator scales out in thirds at 1R, 2R and 3R. Check the Results tab to see how it really performs.</li>
+    </ul>
+  </div>
+  <div class="panel">
+    <h3>More</h3>
+    <a class="linkrow" href="/news">📰 Full economic calendar and news alerts</a>
+    <a class="linkrow" href="/history">🕘 Notification history</a>
+    <a class="linkrow" href="https://www.tradingview.com/chart/?symbol=FOREXCOM:XAUUSD" target="_blank" rel="noopener">📈 Open XAUUSD in TradingView</a>
+  </div>
+</div>
+
+<nav class="tabbar" id="tabbar">
+  <button data-tab="chart" onclick="showTab('chart')"><span class="ti">📈</span><span>Chart</span></button>
+  <button data-tab="results" onclick="showTab('results')"><span class="ti">🏆</span><span>Results</span></button>
+  <button data-tab="signals" onclick="showTab('signals')"><span class="ti">🔔</span><span>Signals</span></button>
+  <button data-tab="tools" onclick="showTab('tools')"><span class="ti">🧰</span><span>Tools</span></button>
+</nav>
 
 <script>
 let allSignals = [];
@@ -834,6 +981,304 @@ function toggleSound() {
 let lwScriptLoaded = false;
 let setupsChartBuilt = false;
 
+// ============= APP SHELL: tabs, live price, sessions, news, results, tools =============
+let livePrice = null;
+function fmt2(v) { return Number(v).toFixed(2); }
+function sgn(v, d) { const x = Number(v); return (x > 0 ? "+" : "") + x.toFixed(d === undefined ? 1 : d); }
+function cls(v) { return v > 0 ? "pos" : (v < 0 ? "neg" : "neu"); }
+
+function showTab(name) {
+  document.querySelectorAll(".tabpane").forEach(function(p) { p.classList.toggle("active", p.id === "pane-" + name); });
+  document.querySelectorAll("#tabbar button").forEach(function(b) { b.classList.toggle("active", b.getAttribute("data-tab") === name); });
+  try { localStorage.setItem("tab", name); } catch (e) {}
+  window.scrollTo(0, 0);
+  if (name === "chart") { loadCtx(); loadCalendar(true); renderSessions(); }
+  if (name === "results") loadResults();
+  if (name === "signals") loadResults(false, true);
+  if (name === "tools") { loadCalendar(); initCalc(); }
+}
+function paintViewSeg(which) {
+  document.querySelectorAll("#viewSeg button").forEach(function(b) { b.classList.toggle("active", b.getAttribute("data-v") === which); });
+}
+
+// ---- live price (header pill) ----
+async function pollPrice() {
+  if (document.hidden) return;
+  try {
+    const d = await (await fetch("/live-price")).json();
+    if (d && d.price) {
+      livePrice = d.price;
+      document.getElementById("ppPrice").textContent = fmt2(d.price);
+      if (typeof renderPlan === "function") renderPlan();
+    }
+  } catch (e) {}
+}
+setInterval(pollPrice, 45000);
+document.addEventListener("visibilitychange", function() { if (!document.hidden) pollPrice(); });
+
+// ---- market sessions ----
+const SESS = [
+  { n: "Sydney", tz: "Australia/Sydney", o: 8, c: 17 },
+  { n: "Tokyo", tz: "Asia/Tokyo", o: 9, c: 18 },
+  { n: "London", tz: "Europe/London", o: 8, c: 17 },
+  { n: "New York", tz: "America/New_York", o: 8, c: 17 }
+];
+const sessFmt = {};
+function sessOpenAt(s, ms) {
+  if (!sessFmt[s.tz]) sessFmt[s.tz] = new Intl.DateTimeFormat("en-US", { timeZone: s.tz, hour: "numeric", hour12: false, weekday: "short" });
+  const parts = sessFmt[s.tz].formatToParts(new Date(ms));
+  let h = 0, wd = "";
+  parts.forEach(function(p) { if (p.type === "hour") h = parseInt(p.value, 10) % 24; if (p.type === "weekday") wd = p.value; });
+  if (wd === "Sat" || wd === "Sun") return false;
+  return h >= s.o && h < s.c;
+}
+function goldClosedAt(ms) {
+  const d = new Date(ms), wd = d.getUTCDay(), h = d.getUTCHours();
+  if (wd === 6) return true;
+  if (wd === 5 && h >= 22) return true;
+  if (wd === 0 && h < 22) return true;
+  return false;
+}
+function dur(mins) {
+  if (mins >= 1440) return Math.round(mins / 1440) + "d";
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? h + "h " + (m < 10 ? "0" : "") + m + "m" : m + "m";
+}
+function renderSessions() {
+  const now = Date.now();
+  const strip = document.getElementById("sessStrip");
+  if (!strip) return;
+  const openNow = [];
+  strip.innerHTML = SESS.map(function(s) {
+    const cur = sessOpenAt(s, now);
+    let mins = 0;
+    for (let k = 1; k <= 60 * 24 * 3; k += 5) {
+      if (sessOpenAt(s, now + k * 60000) !== cur) { mins = k; break; }
+    }
+    if (cur) openNow.push(s.n);
+    return '<div class="sess-pill ' + (cur ? "open" : "") + '"><div class="sn">' + s.n + '</div><div class="ss">' + (cur ? "closes " : "opens ") + dur(mins) + '</div></div>';
+  }).join("");
+  const note = document.getElementById("sessNote");
+  if (goldClosedAt(now)) {
+    note.innerHTML = "🔒 Gold market is closed for the weekend. Reopens Monday 03:30 IST.";
+  } else if (openNow.indexOf("London") >= 0 && openNow.indexOf("New York") >= 0) {
+    note.innerHTML = "🔥 London and New York overlap: highest liquidity and volatility.";
+  } else if (openNow.length === 0) {
+    note.textContent = "Quiet hours between sessions: expect thin liquidity.";
+  } else {
+    note.textContent = "Open now: " + openNow.join(", ");
+  }
+}
+setInterval(renderSessions, 60000);
+
+// ---- news calendar ----
+let calEvents = [], calFilter = "USD", calLoadedAt = 0;
+async function loadCalendar(bannerOnly) {
+  try {
+    if (Date.now() - calLoadedAt > 300000) {
+      const d = await (await fetch("/forex-news")).json();
+      calEvents = d.events || [];
+      calLoadedAt = Date.now();
+    }
+  } catch (e) {}
+  renderBanner();
+  if (!bannerOnly) renderCalendar();
+}
+function renderBanner() {
+  const el = document.getElementById("newsBanner");
+  if (!el) return;
+  const now = Date.now() / 1000;
+  const ev = calEvents.filter(function(e) { return e.country === "USD" && e.impact === "High" && e.time_unix > now - 1200 && e.time_unix < now + 5400; })[0];
+  if (!ev) { el.style.display = "none"; return; }
+  const mins = Math.round((ev.time_unix - now) / 60);
+  el.className = "news-banner" + (mins <= 15 ? " hot" : "");
+  el.style.display = "";
+  el.innerHTML = mins > 0
+    ? "⚠️ <b>USD " + ev.title + "</b> in " + dur(mins) + ". Gold can spike: consider waiting before new entries."
+    : "⚠️ <b>USD " + ev.title + "</b> was just released. Expect fast, whipsaw moves.";
+}
+function setCalFilter(f) { calFilter = f; renderCalendar(); }
+function renderCalendar() {
+  document.querySelectorAll("#calFilter .chip").forEach(function(c) { c.classList.toggle("active", c.getAttribute("data-f") === calFilter); });
+  const el = document.getElementById("calList");
+  if (!el) return;
+  const now = Date.now() / 1000;
+  const list = calEvents.filter(function(e) { return e.impact === "High" && e.time_unix > now - 1800 && (calFilter === "ALL" || e.country === "USD"); }).slice(0, 8);
+  if (!list.length) { el.innerHTML = '<div class="small">No high-impact events coming up.</div>'; return; }
+  el.innerHTML = list.map(function(e) {
+    const mins = Math.round((e.time_unix - now) / 60);
+    return '<div class="cal-item"><div><b>' + e.country + "</b> " + e.title + '<div class="cs">' + indFmtIST(e.time_unix) + ' IST · Fcst ' + (e.forecast || "-") + " · Prev " + (e.previous || "-") + '</div></div><div class="cc ' + (mins <= 60 ? "neg" : "neu") + '">' + (mins > 0 ? "in " + dur(mins) : "now") + "</div></div>";
+  }).join("");
+}
+
+// ---- key levels & volatility ----
+async function loadCtx() {
+  try {
+    const d = await (await fetch("/indicator-data?tf=240")).json();
+    fillCtx(d.levels);
+  } catch (e) {}
+}
+function fillCtx(L) {
+  const g = document.getElementById("ctxGrid");
+  if (!g || !L) return;
+  const cell = function(v, l, c) { return '<div class="kcell"><div class="kv ' + (c || "") + '" style="font-size:15px">' + (v === undefined || v === null ? "-" : v) + '</div><div class="kl">' + l + "</div></div>"; };
+  g.innerHTML =
+    cell(L.pdh !== undefined ? fmt2(L.pdh) : null, "Prev day high") +
+    cell(L.pdl !== undefined ? fmt2(L.pdl) : null, "Prev day low") +
+    cell(L.day_open !== undefined ? fmt2(L.day_open) : null, "Day open") +
+    cell(L.atr_pips !== undefined ? L.atr_pips + " pips" : null, "1H ATR") +
+    cell(L.day_high !== undefined ? fmt2(L.day_high) : null, "Day high", "pos") +
+    cell(L.day_low !== undefined ? fmt2(L.day_low) : null, "Day low", "neg") +
+    cell(L.range_pips !== undefined ? L.range_pips + " pips" : null, "Today's range") +
+    cell(L.prev_range_pips !== undefined ? L.prev_range_pips + " pips" : null, "Yesterday's range");
+}
+
+// ---- results / performance ----
+let resData = null, resPeriod = (function() { try { return localStorage.getItem("resPeriod") || "7"; } catch (e) { return "7"; } })();
+window._resMap = {};
+async function loadResults(force, quiet) {
+  try {
+    if (!resData || force || Date.now() - (resData._at || 0) > 120000) {
+      const d = await (await fetch("/results" + (force ? "?refresh=1" : ""))).json();
+      d._at = Date.now();
+      resData = d;
+      window._resMap = {};
+      (d.trades || []).forEach(function(t) { window._resMap[t.time_unix] = t; });
+      if (typeof renderCards === "function") renderCards();
+    }
+    if (!quiet) renderResults();
+  } catch (e) {
+    if (!quiet) document.getElementById("resHero").innerHTML = '<div class="small">Could not load results. Pull to retry in a moment.</div>';
+  }
+}
+function setResPeriod(p) {
+  resPeriod = p;
+  try { localStorage.setItem("resPeriod", p); } catch (e) {}
+  renderResults();
+}
+function periodCut() {
+  const now = Date.now() / 1000;
+  if (resPeriod === "0") return 0;
+  if (resPeriod === "1") { const ist = now + 19800; return ist - (ist % 86400) - 19800; }
+  return now - parseInt(resPeriod, 10) * 86400;
+}
+function resultLabel(t) {
+  if (t.status === "tp3") return ["TP3 ✔", "win"];
+  if (t.status === "sl") return t.tp_hit === 0 ? ["SL", "loss"] : ["TP" + t.tp_hit + " → SL", t.pips > 0 ? "win" : "mixed"];
+  return [t.tp_hit ? "Open · TP" + t.tp_hit + " hit" : "Open", "open"];
+}
+function resBadge(s) {
+  if (s.kind !== "signal") return "";
+  const t = window._resMap && window._resMap[s.time_unix];
+  if (!t) return "";
+  const lb = resultLabel(t);
+  const p = t.status === "open" ? t.pips + t.float_pips : t.pips;
+  return '<span class="rchip ' + lb[1] + '">' + lb[0] + " · " + sgn(p) + "p</span>";
+}
+function renderResults() {
+  if (!resData) return;
+  document.querySelectorAll("#resPeriod .chip").forEach(function(c) { c.classList.toggle("active", c.getAttribute("data-p") === resPeriod); });
+  const cut = periodCut();
+  const all = (resData.trades || []).filter(function(t) { return t.time_unix >= cut; });
+  const closed = all.filter(function(t) { return t.status !== "open"; }).sort(function(a, b) { return a.time_unix - b.time_unix; });
+  const open = all.filter(function(t) { return t.status === "open"; });
+  const wins = closed.filter(function(t) { return t.pips > 0; });
+  const losses = closed.filter(function(t) { return t.pips < 0; });
+  const sum = function(a, k) { return a.reduce(function(s, t) { return s + t[k]; }, 0); };
+  const net = sum(closed, "pips"), gw = sum(wins, "pips"), gl = Math.abs(sum(losses, "pips"));
+  const netR = sum(closed, "r");
+  const tp1 = all.filter(function(t) { return t.tp_hit >= 1; }).length;
+  const tp2 = all.filter(function(t) { return t.tp_hit >= 2; }).length;
+  const tp3 = all.filter(function(t) { return t.tp_hit >= 3; }).length;
+  const fullSL = closed.filter(function(t) { return t.status === "sl" && t.tp_hit === 0; }).length;
+  const slAfter = closed.filter(function(t) { return t.status === "sl" && t.tp_hit > 0; }).length;
+  let cum = 0, peak = 0, dd = 0;
+  const curve = closed.map(function(t) { cum += t.pips; peak = Math.max(peak, cum); dd = Math.max(dd, peak - cum); return cum; });
+  const openPips = open.reduce(function(s, t) { return s + t.pips + t.float_pips; }, 0);
+  const winRate = closed.length ? Math.round(100 * wins.length / closed.length) : null;
+  const pf = gl > 0 ? (gw / gl).toFixed(2) : (gw > 0 ? "∞" : "-");
+
+  document.getElementById("resUpdated").textContent = "updated " + indFmtIST(resData.updated) + " IST";
+  if (!all.length) {
+    document.getElementById("resHero").innerHTML = '<div class="hn neu">0</div><div class="hl">pips</div><div class="hs">No setups in this period yet. Results fill in automatically as the indicator fires.</div>';
+  } else {
+    document.getElementById("resHero").innerHTML =
+      '<div class="hl">NET RESULT (CLOSED TRADES)</div><div class="hn ' + cls(net) + '">' + sgn(net) + '</div><div class="hl">pips · ' + sgn(netR, 2) + 'R · about ' + (net >= 0 ? "+" : "-") + "$" + Math.abs(net).toFixed(0) + " at 0.10 lot</div>" +
+      '<div class="hs">' + closed.length + " closed · " + open.length + " open" + (open.length ? " (running " + sgn(openPips) + " pips)" : "") + "</div>";
+  }
+  const kc = function(v, l, c) { return '<div class="kcell"><div class="kv ' + (c || "") + '">' + v + '</div><div class="kl">' + l + "</div></div>"; };
+  document.getElementById("resGrid").innerHTML =
+    kc(all.length, "Setups") + kc(winRate === null ? "-" : winRate + "%", "Win rate", winRate !== null && winRate >= 50 ? "pos" : "neg") +
+    kc(tp1, "Hit TP1", "pos") + kc(tp2, "Hit TP2", "pos") +
+    kc(tp3, "Hit TP3", "pos") + kc(fullSL, "Stopped out", "neg") + kc(slAfter, "TP then SL", "neu") + kc(open.length, "Still open", "neu");
+
+  const W = 320, H = 110;
+  if (curve.length < 2) {
+    document.getElementById("resCurve").innerHTML = '<div class="small">The curve appears after two closed trades.</div>';
+  } else {
+    const pts = [0].concat(curve);
+    const mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts), span = (mx - mn) || 1;
+    const xy = pts.map(function(v, i) { return [10 + i * (W - 20) / (pts.length - 1), H - 12 - (v - mn) / span * (H - 24)]; });
+    const line = xy.map(function(p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    const zy = H - 12 - (0 - mn) / span * (H - 24);
+    const col = curve[curve.length - 1] >= 0 ? "#3fb950" : "#f85149";
+    document.getElementById("resCurve").innerHTML =
+      '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" style="display:block"><line x1="10" x2="' + (W - 10) + '" y1="' + zy.toFixed(1) + '" y2="' + zy.toFixed(1) + '" stroke="var(--border)" stroke-dasharray="3 3"/><polyline points="' + line + '" fill="none" stroke="' + col + '" stroke-width="2.2" stroke-linejoin="round"/><circle cx="' + xy[xy.length - 1][0].toFixed(1) + '" cy="' + xy[xy.length - 1][1].toFixed(1) + '" r="3.5" fill="' + col + '"/></svg>';
+  }
+  const dr = function(l, v, c) { return '<div class="drow"><span>' + l + '</span><b class="' + (c || "") + '">' + v + "</b></div>"; };
+  const avgW = wins.length ? gw / wins.length : 0, avgL = losses.length ? gl / losses.length : 0;
+  document.getElementById("resRows").innerHTML =
+    dr("Pips won", "+" + gw.toFixed(1), "pos") + dr("Pips lost to stop losses", "-" + gl.toFixed(1), "neg") +
+    dr("Profit factor", pf) + dr("Average win", "+" + avgW.toFixed(1) + " pips", "pos") + dr("Average loss", "-" + avgL.toFixed(1) + " pips", "neg") +
+    dr("Best trade", closed.length ? sgn(Math.max.apply(null, closed.map(function(t) { return t.pips; }))) + " pips" : "-") +
+    dr("Worst trade", closed.length ? sgn(Math.min.apply(null, closed.map(function(t) { return t.pips; }))) + " pips" : "-") +
+    dr("Max drawdown", "-" + dd.toFixed(1) + " pips", dd > 0 ? "neg" : "") +
+    (resData.untracked ? dr("Not counted (no price history)", resData.untracked) : "");
+  document.getElementById("resLog").innerHTML = all.length ? all.slice(0, 60).map(function(t) {
+    const lb = resultLabel(t);
+    const p = t.status === "open" ? t.pips + t.float_pips : t.pips;
+    return '<div class="logrow"><div><span class="rchip ' + (t.signal === "BUY" ? "win" : "loss") + '">' + t.signal + '</span> <b style="font-size:13px">' + fmt2(t.entry) + '</b><div class="lt">' + indFmtIST(t.time_unix) + " IST · risk " + t.risk_pips + " pips</div></div>" +
+      '<div style="text-align:right"><span class="rchip ' + lb[1] + '">' + lb[0] + '</span><div class="' + cls(p) + '" style="font-weight:800;margin-top:3px">' + sgn(p) + " pips</div></div></div>";
+  }).join("") : '<div class="small">Nothing to show for this period.</div>';
+}
+
+// ---- tools ----
+let calcReady = false;
+function initCalc() {
+  if (calcReady) return;
+  calcReady = true;
+  const get = function(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  document.getElementById("cBal").value = get("cBal", "1000");
+  document.getElementById("cRisk").value = get("cRisk", "1");
+  document.getElementById("pLots").value = get("pLots", "0.10");
+  document.getElementById("pPips").value = "100";
+  calcPips();
+}
+function fillFromSetup() {
+  const L = window._indData && window._indData.latest;
+  if (!L) { document.getElementById("cOut").textContent = "No setup loaded yet. Open the Chart tab first."; return; }
+  document.getElementById("cEntry").value = L.entry;
+  document.getElementById("cSL").value = L.sl;
+  calcLots();
+}
+function calcLots() {
+  const bal = parseFloat(document.getElementById("cBal").value), rk = parseFloat(document.getElementById("cRisk").value);
+  const e = parseFloat(document.getElementById("cEntry").value), s = parseFloat(document.getElementById("cSL").value);
+  try { localStorage.setItem("cBal", bal); localStorage.setItem("cRisk", rk); } catch (x) {}
+  const out = document.getElementById("cOut");
+  if (!(bal > 0 && rk > 0 && e > 0 && s > 0) || e === s) { out.textContent = "Enter balance, risk %, entry and stop loss."; return; }
+  const dist = Math.abs(e - s), riskUsd = bal * rk / 100;
+  const lots = Math.floor(riskUsd / (dist * 100) * 100) / 100;
+  const perR = lots * 100 * dist;
+  out.innerHTML = "<b>Lot size: " + lots.toFixed(2) + "</b><br>Stop distance: " + (dist / 0.1).toFixed(1) + " pips ($" + dist.toFixed(2) + ")<br>Money at risk: $" + (lots * 100 * dist).toFixed(2) + " (" + rk + "% of $" + bal + ")<br>Full plan if TP3 is reached: about +$" + (perR * 2).toFixed(2) + " (+2R)";
+  if (lots < 0.01) out.innerHTML += '<br><span class="neg">Below the 0.01 minimum lot: lower the risk or widen the balance.</span>';
+}
+function calcPips() {
+  const p = parseFloat(document.getElementById("pPips").value), l = parseFloat(document.getElementById("pLots").value);
+  try { localStorage.setItem("pLots", l); } catch (x) {}
+  document.getElementById("pOut").innerHTML = (p > 0 || p < 0) && l > 0 ? "<b>$" + (p * l * 10).toFixed(2) + "</b> for " + p + " pips at " + l + " lot" : "-";
+}
+
 // ============= GOLD INDICATOR CHART (in-app) =============
 let indBuilt = false, indTimer = null, indChart = null, indCandles = null, indHi = null, indLo = null, indLevelSeries = [], indFirstFit = true;
 let indTF = (function() { try { return localStorage.getItem("indTF") || "15"; } catch (e) { return "15"; } })();
@@ -906,6 +1351,46 @@ function startIndTimer() {
   }, 60000);
 }
 
+let indLvlLines = [];
+function renderPlan() {
+  const data = window._indData;
+  const info = document.getElementById("indInfo");
+  if (!data || !info) return;
+  const L = data.latest;
+  const price = livePrice || data.price;
+  if (!L) {
+    info.innerHTML = '<div class="ind-head"><span class="ind-chip neutral">No setup in the loaded window</span></div><div style="color:var(--muted);font-size:11px">Last price ' + fmt2(price) + "</div>";
+    return;
+  }
+  const buy = L.signal === "BUY", sign = buy ? 1 : -1;
+  const risk = Math.abs(L.entry - L.sl);
+  const fpips = (price - L.entry) * sign / 0.1;
+  const fr = (price - L.entry) * sign / risk;
+  const st = L.status || "Active";
+  const stColor = st === "Active" ? "var(--accent)" : (st.indexOf("SL") >= 0 ? "var(--sell)" : "var(--buy)");
+  const span = L.tp3 - L.sl;
+  const pos = function(v) { return Math.max(0, Math.min(100, (v - L.sl) / span * 100)); };
+  info.innerHTML =
+    '<div class="ind-head"><span class="ind-chip ' + (buy ? "buy" : "sell") + '">' + (buy ? "▲ BULLISH · BUY" : "▼ BEARISH · SELL") + "</span>" +
+    '<span style="color:var(--muted)">Setup ' + indFmtIST(L.time_unix) + ' IST · <b style="color:' + stColor + '">' + st + "</b></span></div>" +
+    '<div class="ind-grid">' +
+    '<div class="ind-cell"><div class="v">' + fmt2(L.entry) + '</div><div class="l">Entry</div></div>' +
+    '<div class="ind-cell"><div class="v" style="color:var(--sell)">' + fmt2(L.sl) + '</div><div class="l">SL</div></div>' +
+    '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + fmt2(L.tp1) + '</div><div class="l">TP1</div></div>' +
+    '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + fmt2(L.tp2) + '</div><div class="l">TP2</div></div>' +
+    '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + fmt2(L.tp3) + '</div><div class="l">TP3</div></div>' +
+    "</div>" +
+    '<div class="plan-bar"><div class="tick" style="left:0"></div><div class="tl" style="left:0%">SL</div>' +
+    '<div class="tick" style="left:' + pos(L.entry) + '%"></div><div class="tl" style="left:' + pos(L.entry) + '%">Entry</div>' +
+    '<div class="tick" style="left:' + pos(L.tp1) + '%"></div><div class="tl" style="left:' + pos(L.tp1) + '%">TP1</div>' +
+    '<div class="tick" style="left:' + pos(L.tp2) + '%"></div><div class="tl" style="left:' + pos(L.tp2) + '%">TP2</div>' +
+    '<div class="tick" style="left:100%"></div><div class="tl" style="left:97%">TP3</div>' +
+    '<div class="you" style="left:' + pos(price) + '%"></div></div>' +
+    '<div class="drow"><span>Live price</span><b>' + fmt2(price) + "</b></div>" +
+    '<div class="drow"><span>Floating on this setup</span><b class="' + cls(fpips) + '">' + sgn(fpips) + " pips (" + sgn(fr, 2) + "R)</b></div>" +
+    '<div class="drow"><span>Risk on this setup</span><b>' + (L.risk_pips !== undefined ? L.risk_pips : (risk / 0.1).toFixed(1)) + " pips</b></div>";
+}
+
 async function loadIndData() {
   const info = document.getElementById("indInfo");
   try {
@@ -914,6 +1399,7 @@ async function loadIndData() {
     const data = await res.json();
     const bars = data.bars || [];
     if (!bars.length) { info.textContent = "No candle data yet (" + (data.error || "waiting for first update") + ")."; return; }
+    window._indData = data;
     indCandles.setData(bars);
     indHi.setData(data.struct_high || []);
     indLo.setData(data.struct_low || []);
@@ -946,30 +1432,20 @@ async function loadIndData() {
         indLevelSeries.push(s);
       });
     }
+    indLvlLines.forEach(function(pl) { indCandles.removePriceLine(pl); });
+    indLvlLines = [];
+    const LV = data.levels || {};
+    [["PDH", LV.pdh], ["PDL", LV.pdl]].forEach(function(x) {
+      if (x[1] !== undefined && x[1] !== null) indLvlLines.push(indCandles.createPriceLine({ price: x[1], color: "#9aa4b2", lineWidth: 1, lineStyle: 3, axisLabelVisible: true, title: x[0] }));
+    });
+    fillCtx(LV);
     if (indFirstFit) {
       indFirstFit = false;
       const n = bars.length;
       indChart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 110), to: n + 6 });
     }
-
     document.getElementById("indUpdated").textContent = (data.market_closed ? "Market closed · " : "") + "updated " + indFmtIST(data.updated || lastT) + " IST";
-    if (L) {
-      const buy = L.signal === "BUY";
-      const st = L.status || "Active";
-      const stColor = st === "Active" ? "var(--accent)" : (st.indexOf("SL") >= 0 ? "var(--sell)" : "var(--buy)");
-      info.innerHTML =
-        '<div class="ind-head"><span class="ind-chip ' + (buy ? "buy" : "sell") + '">' + (buy ? "▲ BULLISH · BUY" : "▼ BEARISH · SELL") + '</span>' +
-        '<span style="color:var(--muted)">Setup ' + indFmtIST(L.time_unix) + ' IST · <b style="color:' + stColor + '">' + st + '</b></span></div>' +
-        '<div class="ind-grid">' +
-        '<div class="ind-cell"><div class="v">' + L.entry.toFixed(2) + '</div><div class="l">Entry</div></div>' +
-        '<div class="ind-cell"><div class="v" style="color:var(--sell)">' + L.sl.toFixed(2) + '</div><div class="l">SL</div></div>' +
-        '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + L.tp1.toFixed(2) + '</div><div class="l">TP1</div></div>' +
-        '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + L.tp2.toFixed(2) + '</div><div class="l">TP2</div></div>' +
-        '<div class="ind-cell"><div class="v" style="color:var(--buy)">' + L.tp3.toFixed(2) + '</div><div class="l">TP3</div></div>' +
-        '</div><div style="margin-top:8px;color:var(--muted);font-size:11px">Last price ' + Number(data.price).toFixed(2) + ' · chart refreshes about every 5 minutes</div>';
-    } else {
-      info.innerHTML = '<div class="ind-head"><span class="ind-chip neutral">No setup in the loaded window</span></div><div style="color:var(--muted);font-size:11px">Last price ' + Number(data.price).toFixed(2) + '</div>';
-    }
+    renderPlan();
   } catch (e) {
     info.textContent = "Could not load indicator data. It will retry automatically.";
   }
@@ -978,6 +1454,7 @@ async function loadIndData() {
 function selectChart(which) {
   localStorage.setItem("chartChoice", which);
   closeChooser();
+  paintViewSeg(which);
   document.getElementById("tvCard").style.display = which === "tv" ? "" : "none";
   document.getElementById("setupsCard").style.display = which === "setups" ? "" : "none";
   document.getElementById("indCard").style.display = which === "ind" ? "" : "none";
@@ -1211,7 +1688,7 @@ function renderCards() {
         <div class="card-body">
           <div class="badge-row">
             <span class="badge ${badgeClass}">${arrow} ${s.signal}</span>
-            <span class="kind-tag">${kindLabel}</span>
+            <span style="display:flex;gap:6px;align-items:center">${resBadge(s)}<span class="kind-tag">${kindLabel}</span></span>
           </div>
           <div class="rows">
             <div class="row entry"><span class="label">Entry</span><span class="value">${s.entry}</span></div>
@@ -1279,7 +1756,7 @@ async function load(manual) {
   try {
     const res = await fetch("/latest");
     const data = await res.json();
-    allSignals = data.signals || [];
+    allSignals = (data.signals || []).filter(function(s) { return !(s.entry === "DUMMY" || (String(s.entry) === "4000.00" && String(s.sl) === "3990.00")); });
     if (allSignals.length > 0) {
       const topKey = allSignals[0].time + allSignals[0].signal + allSignals[0].kind;
       if (lastSeenSignalKey !== null && topKey !== lastSeenSignalKey) {
@@ -1340,7 +1817,6 @@ async function loadForexTicker() {
 load();
 loadTicker();
 loadForexTicker();
-loadWeekStats();
 setInterval(load, 20000);
 setInterval(loadTicker, 120000);
 setInterval(loadForexTicker, 600000);
@@ -1348,6 +1824,9 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(()=>{});
 }
 updateNotifyBtn();
+pollPrice();
+renderSessions();
+showTab((function() { try { return localStorage.getItem("tab") || "chart"; } catch (e) { return "chart"; } })());
 </script>
 </body>
 </html>"""
@@ -2282,6 +2761,7 @@ def indicator_data():
     if sigs:
         latest = _ev_dict(sigs[-1])
         latest["status"] = _setup_status(sigs[-1], det1)
+        latest["risk_pips"] = round(abs(sigs[-1]["entry"] - sigs[-1]["sl"]) / GOLD_PIP, 1)
     body = {
         "bars": disp,
         "period": period,
@@ -2293,8 +2773,195 @@ def indicator_data():
         "last_candle": bars1[-1]["time"],
         "updated": int(_ind_raw["ts"]),
         "market_closed": market_is_closed(),
+        "levels": _levels(bars15),
     }
     return Response(json.dumps(body), mimetype="application/json")
+
+
+GOLD_PIP = 0.1   # 1 pip = $0.10 price move on gold (10 pips = $1.00)
+_res_cache = {"ts": 0, "trades": None, "untracked": 0, "price": None, "error": None}
+_res_closed = {}
+_lp_cache = {"ts": 0, "price": None, "src": None}
+
+
+def _is_real_signal(s):
+    if s.get("kind") != "signal" or "time_unix" not in s:
+        return False
+    try:
+        for k in ("entry", "sl", "tp1", "tp2", "tp3"):
+            float(s[k])
+    except Exception:
+        return False
+    if str(s.get("entry")) == "4000.00" and str(s.get("sl")) == "3990.00":
+        return False  # dummy test alert
+    return True
+
+
+def _sig_key(s):
+    return "%s|%s|%s" % (s.get("time_unix"), s.get("signal"), s.get("entry"))
+
+
+def _trade_outcome(s, b1, b15):
+    sign = 1 if s["signal"] == "BUY" else -1
+    entry, sl = float(s["entry"]), float(s["sl"])
+    tps = [float(s["tp1"]), float(s["tp2"]), float(s["tp3"])]
+    t = int(s["time_unix"])
+    risk = abs(entry - sl)
+    if risk <= 0:
+        return None
+    if b1 and b1[0]["time"] <= t:
+        bars = [b for b in b1 if b["time"] > t]
+        src = "1m"
+    elif b15 and b15[0]["time"] <= t:
+        nxt = t - t % 900 + 900
+        bars = [b for b in b15 if b["time"] >= nxt]
+        src = "15m"
+    else:
+        return None
+    tp_hit = 0
+    sl_hit = False
+    mfe = 0.0
+    mae = 0.0
+    for b in bars:
+        fav = (b["high"] - entry) if sign == 1 else (entry - b["low"])
+        adv = (entry - b["low"]) if sign == 1 else (b["high"] - entry)
+        sl_touch = (b["low"] <= sl) if sign == 1 else (b["high"] >= sl)
+        mae = max(mae, adv)
+        if sl_touch:
+            sl_hit = True  # conservative: if a candle touches SL and a target, SL counts first
+            break
+        mfe = max(mfe, fav)
+        for n in (1, 2, 3):
+            hit = (b["high"] >= tps[n - 1]) if sign == 1 else (b["low"] <= tps[n - 1])
+            if hit and n > tp_hit:
+                tp_hit = n
+        if tp_hit == 3:
+            break
+    risk_pips = risk / GOLD_PIP
+    booked_r = sum(range(1, tp_hit + 1)) / 3.0   # one third closed at each target reached (1R, 2R, 3R)
+    status = "sl" if sl_hit else ("tp3" if tp_hit == 3 else "open")
+    r = booked_r - (3 - tp_hit) / 3.0 if sl_hit else booked_r
+    last = bars[-1]["close"] if bars else entry
+    float_r = 0.0
+    if status == "open":
+        float_r = ((last - entry) * sign / risk) * (3 - tp_hit) / 3.0
+    return {"status": status, "tp_hit": tp_hit, "r": round(r, 3), "pips": round(r * risk_pips, 1),
+            "float_pips": round(float_r * risk_pips, 1), "risk_pips": round(risk_pips, 1),
+            "mfe_pips": round(mfe / GOLD_PIP, 1), "mae_pips": round(mae / GOLD_PIP, 1), "src": src}
+
+
+def _compute_results(force=False):
+    now = _time_mod.time()
+    if _res_cache["trades"] is not None and now - _res_cache["ts"] < (60 if force else 300):
+        return _res_cache
+    history, _ = gh_load_history()
+    sigs = [s for s in history if _is_real_signal(s)]
+    todo = [s for s in sigs if _sig_key(s) not in _res_closed]
+    b1 = b15 = None
+    if todo:
+        oldest = min(int(s["time_unix"]) for s in todo)
+        raw1, raw15 = _ind_raw["b1"], _ind_raw["b15"]
+        if raw1 and raw1[0]["time"] <= oldest and (now - _ind_raw["ts"] < 420 or market_is_closed()):
+            b1, b15 = raw1, raw15
+        else:
+            b15 = fetch_ohlc(interval="15min", outputsize=5000)
+            b1 = fetch_ohlc(interval="1min", outputsize=5000)
+            if not b15 and not b1:
+                b1, b15 = raw1, raw15
+            if not b15 and not b1:
+                _res_cache["error"] = "Could not fetch price history"
+                if _res_cache["trades"] is not None:
+                    return _res_cache
+    trades = []
+    untracked = 0
+    for s in sigs:
+        key = _sig_key(s)
+        o = _res_closed.get(key)
+        if o is None:
+            o = _trade_outcome(s, b1, b15)
+            if o is not None and o["status"] != "open":
+                _res_closed[key] = o
+        if o is None:
+            untracked += 1
+            continue
+        t = {"time_unix": int(s["time_unix"]), "time": s.get("time", ""), "signal": s["signal"],
+             "entry": float(s["entry"]), "sl": float(s["sl"]), "tp1": float(s["tp1"]),
+             "tp2": float(s["tp2"]), "tp3": float(s["tp3"])}
+        t.update(o)
+        trades.append(t)
+    trades.sort(key=lambda x: x["time_unix"], reverse=True)
+    price = None
+    src = b1 or b15 or _ind_raw["b1"] or _ind_raw["b15"]
+    if src:
+        price = src[-1]["close"]
+    _res_cache.update({"ts": now, "trades": trades, "untracked": untracked, "price": price, "error": None})
+    return _res_cache
+
+
+@app.route("/results", methods=["GET"])
+def results_endpoint():
+    c = _compute_results(force=request.args.get("refresh") == "1")
+    return Response(json.dumps({
+        "trades": c["trades"] or [], "untracked": c["untracked"], "price": c["price"],
+        "updated": int(c["ts"]), "pip": GOLD_PIP, "error": c["error"]
+    }), mimetype="application/json")
+
+
+@app.route("/live-price", methods=["GET"])
+def live_price():
+    now = _time_mod.time()
+    if _lp_cache["price"] is not None and now - _lp_cache["ts"] < 45:
+        return Response(json.dumps(_lp_cache), mimetype="application/json")
+    price, src = None, None
+    if TWELVE_DATA_KEY and not market_is_closed():
+        try:
+            r = requests.get("https://api.twelvedata.com/price",
+                             params={"symbol": "XAU/USD", "apikey": TWELVE_DATA_KEY}, timeout=8)
+            price = float(r.json()["price"])
+            src = "live"
+        except Exception as e:
+            print("live-price failed:", repr(e))
+    if price is None:
+        raw = _ind_raw["b1"] or _ind_raw["b15"]
+        if raw:
+            price, src = raw[-1]["close"], "candle"
+    if price is None:
+        return Response(json.dumps({"price": None}), mimetype="application/json")
+    _lp_cache.update({"ts": now, "price": price, "src": src})
+    return Response(json.dumps(_lp_cache), mimetype="application/json")
+
+
+def _levels(bars15):
+    if not bars15:
+        return None
+    day0 = bars15[-1]["time"] - bars15[-1]["time"] % 86400
+
+    def span(a, b):
+        return [x for x in bars15 if a <= x["time"] < b]
+
+    today = span(day0, day0 + 86400)
+    prev = []
+    d = day0
+    for _ in range(5):
+        d -= 86400
+        prev = span(d, d + 86400)
+        if len(prev) >= 8:
+            break
+    out = {}
+    if today:
+        dh = max(x["high"] for x in today)
+        dl = min(x["low"] for x in today)
+        out.update({"day_open": today[0]["open"], "day_high": dh, "day_low": dl,
+                    "range_pips": round((dh - dl) / GOLD_PIP)})
+    if len(prev) >= 8:
+        ph = max(x["high"] for x in prev)
+        pl = min(x["low"] for x in prev)
+        out.update({"pdh": ph, "pdl": pl, "pdc": prev[-1]["close"], "prev_range_pips": round((ph - pl) / GOLD_PIP)})
+    h1 = _agg(bars15, 3600)
+    atr = [v for v in compute_atr(h1, 14) if v is not None]
+    if atr:
+        out["atr_pips"] = round(atr[-1] / GOLD_PIP)
+    return out
 
 
 @app.route("/stats7d", methods=["GET"])
