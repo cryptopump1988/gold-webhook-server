@@ -1,5 +1,18 @@
 [
   {
+    "symbol": "TEST",
+    "signal": "BUY",
+    "kind": "touch",
+    "entry": "DUMMY",
+    "sl": "DUMMY",
+    "tp1": "DUMMY",
+    "tp2": "DUMMY",
+    "tp3": "DUMMY",
+    "chart_url": "",
+    "time": "08 Oct 2026, 18:44 UTC",
+    "time_unix": 1791485068
+  },
+  {
     "symbol": "XAUUSD",
     "signal": "SELL",
     "kind": "signal",
