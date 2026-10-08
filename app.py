@@ -2856,6 +2856,21 @@ def _compute_results(force=False):
         return _res_cache
     history, _ = gh_load_history()
     sigs = [s for s in history if _is_real_signal(s)]
+    try:
+        # indicator setups from the last day that were never alerted (e.g. server was paused): include them so results match the chart
+        r1, r15 = _ind_raw["b1"], _ind_raw["b15"]
+        if r1 and r15:
+            for ev in detect_events_dual_tf(drop_unfinished_bar(r15, 900), drop_unfinished_bar(r1, 60)):
+                if ev["kind"] != "signal":
+                    continue
+                if any(h.get("signal") == ev["signal"] and abs(int(h.get("time_unix", 0) or 0) - ev["time_unix"]) <= 300 for h in history):
+                    continue
+                f2 = lambda v: "%.2f" % v
+                sigs.append({"signal": ev["signal"], "kind": "signal", "entry": f2(ev["entry"]), "sl": f2(ev["sl"]),
+                             "tp1": f2(ev["tp1"]), "tp2": f2(ev["tp2"]), "tp3": f2(ev["tp3"]), "time_unix": ev["time_unix"],
+                             "time": datetime.utcfromtimestamp(ev["time_unix"]).strftime("%d %b %Y, %H:%M UTC")})
+    except Exception as e:
+        print("results: chart-signal merge failed:", repr(e))
     todo = [s for s in sigs if _sig_key(s) not in _res_closed]
     b1 = b15 = None
     if todo:
