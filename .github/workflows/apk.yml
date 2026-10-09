@@ -40,6 +40,18 @@ jobs:
           plugins { id 'com.android.application' }
           android {
               namespace 'com.bakalestrading.gold'
+              signingConfigs {
+                  release {
+                      storeFile file(project.findProperty('ks') ?: 'none')
+                      storePassword project.findProperty('kpw')
+                      keyAlias 'bullion'
+                      keyPassword project.findProperty('kpw')
+                  }
+              }
+              buildTypes {
+                  release { signingConfig signingConfigs.release }
+              }
+              lint { checkReleaseBuilds false }
               compileSdk 34
               defaultConfig {
                   applicationId 'com.bakalestrading.gold'
@@ -94,10 +106,16 @@ jobs:
           </vector>
           EOF
       - name: Build APK
-        run: gradle --no-daemon assembleDebug
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KS_B64" || { echo "Add the KEYSTORE_B64 and KEYSTORE_PASSWORD repository secrets first"; exit 1; }
+          echo "$KS_B64" | base64 -d > "$GITHUB_WORKSPACE/br.jks"
+          gradle --no-daemon assembleRelease -Pks="$GITHUB_WORKSPACE/br.jks" -Pkpw="$KS_PASS"
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Bullion-Radar.apk
+          cp app/build/outputs/apk/release/app-release.apk Bullion-Radar.apk
           gh release create "apk-${{ github.run_number }}" Bullion-Radar.apk --repo "${{ github.repository }}" --title "Bullion Radar APK #${{ github.run_number }}" --notes "Install on Android. Allow install from unknown sources if asked."
