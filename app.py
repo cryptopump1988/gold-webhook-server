@@ -3321,6 +3321,17 @@ def admin_update():
     return _json({"ok": True})
 
 
+@app.route("/admin/api/test-push", methods=["POST"])
+def admin_test_push():
+    if not _is_admin():
+        return _json({"error": "auth"}, 401)
+    try:
+        send_push_to_all("\U0001F7E1 TEST - BUY XAUUSD", "Entry 2650.00 | SL 2642.00 | TP1 2662.00 | dummy signal to preview notifications", "/")
+    except Exception as e:
+        return _json({"error": str(e)}, 500)
+    return _json({"ok": True})
+
+
 @app.route("/admin", methods=["GET"])
 def admin_page():
     return Response(ADMIN_HTML, mimetype="text/html")
@@ -3347,6 +3358,7 @@ button.s{background:#262932;color:var(--t);border:1px solid var(--b)}button.d{ba
 <div class="row"><div><label>Valid for (days, 0 = no expiry)</label><input id="nd" type="number" value="30"></div>
 <div><label>Max devices</label><input id="nm" type="number" value="2"></div></div>
 <button onclick="create()">Create key</button><div id="msg2"></div></div>
+<div class="card"><b>Test notification</b><div class="m">Sends a dummy signal push to every subscribed device.</div><button onclick="testPush()">Send test signal</button><div id="msg3" class="m"></div></div>
 <div id="list"></div></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -3367,6 +3379,7 @@ async function act(id,a,d){const r=await api("/admin/api/update",{id,action:a,da
 async function del(id){if(confirm("Delete this key permanently?"))act(id,"delete")}
 async function create(){const r=await api("/admin/api/create",{label:$("nl").value,days:$("nd").value,max_devices:$("nm").value});
 if(r.s==200){$("nl").value="";$("msg2").textContent="Created "+r.j.key.key+" (tap it in the list to copy)"}else $("msg2").textContent=r.j.error||"Failed";load()}
+async function testPush(){$("msg3").textContent="Sending...";const r=await api("/admin/api/test-push",{});$("msg3").textContent=r.s==200?"Sent - check your phone":(r.j.error||"Failed")}
 load();
 </script></body></html>"""
 
