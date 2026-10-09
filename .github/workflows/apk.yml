@@ -75,16 +75,22 @@ jobs:
           </manifest>
           EOF
           cat > app/src/main/res/values/strings.xml <<'EOF'
-          <resources><string name="app_name">Gold Signals</string></resources>
+          <resources><string name="app_name">Bullion Radar</string></resources>
           EOF
           cat > app/src/main/res/values/colors.xml <<'EOF'
           <resources><color name="bar">#111111</color></resources>
           EOF
           cat > app/src/main/res/drawable/ic_launcher.xml <<'EOF'
           <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="96dp" android:height="96dp" android:viewportWidth="96" android:viewportHeight="96">
-              <path android:fillColor="#111111" android:pathData="M0,0h96v96h-96z" />
-              <path android:fillColor="#F5B301" android:pathData="M48,48m-34,0a34,34 0,1 1,68 0a34,34 0,1 1,-68 0" />
-              <path android:fillColor="#111111" android:pathData="M30,56l18,-26l18,26l-9,0l0,10l-18,0l0,-10z" />
+              <path android:fillColor="#0D1117" android:pathData="M0,0h96v96h-96z" />
+              <path android:fillColor="#00000000" android:strokeColor="#F5B301" android:strokeWidth="3" android:pathData="M48,48m-36,0a36,36 0,1 1,72 0a36,36 0,1 1,-72 0" />
+              <path android:fillColor="#00000000" android:strokeColor="#F5B301" android:strokeWidth="2.5" android:strokeAlpha="0.75" android:pathData="M48,48m-24,0a24,24 0,1 1,48 0a24,24 0,1 1,-48 0" />
+              <path android:fillColor="#00000000" android:strokeColor="#F5B301" android:strokeWidth="2" android:strokeAlpha="0.5" android:pathData="M48,48m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0" />
+              <path android:fillColor="#00000000" android:strokeColor="#F5B301" android:strokeWidth="1.5" android:strokeAlpha="0.4" android:pathData="M48,8L48,88M8,48L88,48" />
+              <path android:fillColor="#F5B301" android:fillAlpha="0.3" android:pathData="M48,48L48,12A36,36 0,0 1,79,30z" />
+              <path android:fillColor="#00000000" android:strokeColor="#FFD54A" android:strokeWidth="3.5" android:strokeLineCap="round" android:pathData="M48,48L79,30" />
+              <path android:fillColor="#FFD54A" android:pathData="M66,26m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+              <path android:fillColor="#F5B301" android:pathData="M48,48m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0" />
           </vector>
           EOF
       - name: Build APK
@@ -93,5 +99,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Gold-Signals.apk
-          gh release create "apk-${{ github.run_number }}" Gold-Signals.apk --repo "${{ github.repository }}" --title "Gold Signals APK #${{ github.run_number }}" --notes "Install on Android. Allow install from unknown sources if asked."
+          cp app/build/outputs/apk/debug/app-debug.apk Bullion-Radar.apk
+          gh release create "apk-${{ github.run_number }}" Bullion-Radar.apk --repo "${{ github.repository }}" --title "Bullion Radar APK #${{ github.run_number }}" --notes "Install on Android. Allow install from unknown sources if asked."
