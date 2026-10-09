@@ -1859,7 +1859,7 @@ async function loadForexTicker() {
 load();
 loadTicker();
 loadForexTicker();
-setInterval(load, 20000);
+setInterval(load, 5000);
 setInterval(loadTicker, 120000);
 setInterval(loadForexTicker, 600000);
 if ("serviceWorker" in navigator) {
@@ -3386,10 +3386,17 @@ load();
 
 
 
+_lat_cache = {"ts": 0, "d": None}
+
+
 @app.route("/latest", methods=["GET"])
 def latest():
-    history, _ = gh_load_history()
-    return Response(json.dumps({"signals": history}), mimetype="application/json")
+    import time as _t
+    if _lat_cache["d"] is None or _t.time() - _lat_cache["ts"] > 4:
+        _h, _ = gh_load_history()
+        _lat_cache["d"] = _h
+        _lat_cache["ts"] = _t.time()
+    return Response(json.dumps({"signals": _lat_cache["d"]}), mimetype="application/json")
 
 
 @app.route("/webhook", methods=["POST"])
