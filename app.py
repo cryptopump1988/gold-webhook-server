@@ -118,9 +118,12 @@ def send_push_to_all(title, body_text, url_path="/"):
     still_valid = []
     changed = False
     for sub in subs:
+        if not _push_allowed(sub):
+            still_valid.append(sub)
+            continue
         try:
             webpush(
-                subscription_info=sub,
+                subscription_info={k: v for k, v in sub.items() if k != "_k"},
                 data=payload,
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims={"sub": VAPID_CLAIMS_EMAIL},
@@ -641,8 +644,47 @@ body { padding-bottom: 86px; }
 .linkrow { display:block; padding:11px 0; border-bottom:1px solid var(--border); color:var(--text); text-decoration:none; font-size:14px; font-weight:600; }
 .linkrow:last-child { border-bottom:0; }
 </style>
+<script>
+(function(){
+  var _f=window.fetch;
+  window.fetch=function(){
+    var a=arguments;
+    return _f.apply(this,a).then(function(r){
+      if(r.status===401){
+        var u=String((a[0]&&a[0].url)||a[0]||"");
+        if(u.indexOf("/auth")<0&&u.indexOf("/admin")<0&&window.__showLock) window.__showLock();
+      }
+      return r;
+    });
+  };
+})();
+</script>
 </head>
 <body>
+<div id="lockOv" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#0e0f12;color:#f2f3f5;align-items:center;justify-content:center;padding:24px;font-family:system-ui,sans-serif">
+  <div style="max-width:340px;width:100%;text-align:center">
+    <div style="width:64px;height:64px;border-radius:50%;background:#f5b301;margin:0 auto 14px"></div>
+    <h2 style="margin:0 0 6px">Gold Signals</h2>
+    <p style="color:#9aa0ab;margin:0 0 16px">Private access. Enter your access key to continue.</p>
+    <input id="lockKey" placeholder="GS-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" style="width:100%;box-sizing:border-box;background:#181a20;color:#f2f3f5;border:1px solid #2a2d36;border-radius:10px;padding:13px;font-size:16px;text-align:center;letter-spacing:1px">
+    <button id="lockBtn" style="width:100%;margin-top:10px;background:#f5b301;color:#111;border:0;border-radius:10px;padding:13px;font-size:16px;font-weight:700">Unlock</button>
+    <div id="lockErr" style="color:#ff8a8f;font-size:13px;margin-top:10px;min-height:18px"></div>
+  </div>
+</div>
+<script>
+window.__showLock=function(){var o=document.getElementById("lockOv");if(o)o.style.display="flex";};
+document.getElementById("lockBtn").onclick=async function(){
+  var k=document.getElementById("lockKey").value, e=document.getElementById("lockErr");
+  e.textContent="Checking...";
+  try{
+    var r=await fetch("/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:k})});
+    var j=await r.json();
+    if(r.ok){location.reload();}else{e.textContent=j.error||"Invalid key";}
+  }catch(x){e.textContent="Network error, try again";}
+};
+document.getElementById("lockKey").addEventListener("keydown",function(ev){if(ev.key==="Enter")document.getElementById("lockBtn").click();});
+fetch("/auth-status",{cache:"no-store"}).then(function(r){return r.json();}).then(function(s){if(s.gated&&!s.ok)window.__showLock();}).catch(function(){});
+</script>
 <div class="header">
   <div class="brand">
     <div class="logo">G</div>
@@ -2603,6 +2645,9 @@ def subscribe():
     if not sub or "endpoint" not in sub:
         return "Invalid subscription", 400
     subs, sha = gh_load_json(SUBS_PATH)
+    _kid = _current_key_id()
+    if _kid:
+        sub["_k"] = _kid
     if not any(s.get("endpoint") == sub.get("endpoint") for s in subs):
         subs.append(sub)
         gh_save_json(SUBS_PATH, subs, sha)
@@ -2982,6 +3027,350 @@ def _levels(bars15):
 @app.route("/stats7d", methods=["GET"])
 def stats7d():
     return Response(json.dumps(get_7day_stats()), mimetype="application/json")
+
+
+# =============================================================
+# ACCESS KEYS (paid access): set ADMIN_KEY in Render to switch on
+# ================================================================
+import secrets as _sec
+import hmac as _hm
+import hashlib as _hl
+import time as _tm
+from datetime import timedelta as _td
+
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "")
+KEYS_PATH = "data/keys.json"
+_kc = {"ts": 0, "list": []}
+_fails = {}
+_OPEN_PATHS = {"/", "/ping", "/manifest.json", "/sw.js", "/vapid-public-key", "/scan-signals",
+               "/check-forex-news", "/webhook", "/auth", "/auth-status"}
+
+
+def _eq(a, b):
+    if not a or not b:
+        return False
+    return _hm.compare_digest(str(a).encode(), str(b).encode())
+
+
+def _today():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _key_active(rec):
+    if not rec or rec.get("revoked"):
+        return False
+    exp = rec.get("expires")
+    return (not exp) or _today() <= exp
+
+
+def _keys():
+    if _tm.time() - _kc["ts"] > 90:
+        lst, sha = gh_load_json(KEYS_PATH)
+        if sha is not None and isinstance(lst, list):
+            _kc["list"] = lst
+            _kc["ts"] = _tm.time()
+        elif not _kc["list"]:
+            _kc["ts"] = _tm.time()
+        else:
+            _kc["ts"] = _tm.time() - 60  # GitHub hiccup: keep old keys, retry in 30s
+    return _kc["list"]
+
+
+def _keys_write(mutator):
+    lst, sha = gh_load_json(KEYS_PATH)
+    if sha is None and _kc["list"]:
+        return False, None
+    result = mutator(lst)
+    if gh_save_json(KEYS_PATH, lst, sha):
+        _kc["list"] = lst
+        _kc["ts"] = _tm.time()
+        return True, result
+    return False, None
+
+
+def _find_by_value(val):
+    v = (val or "").strip().upper()
+    for r in _keys():
+        if _eq(r.get("key"), v):
+            return r
+    return None
+
+
+def _find_by_id(kid):
+    for r in _keys():
+        if r.get("id") == kid:
+            return r
+    return None
+
+
+def _client_ip():
+    return (request.headers.get("X-Forwarded-For", request.remote_addr or "") or "").split(",")[0].strip()
+
+
+def _rate_blocked():
+    ip = _client_ip()
+    now = _tm.time()
+    arr = [t for t in _fails.get(ip, []) if now - t < 600]
+    _fails[ip] = arr
+    return len(arr) >= 8
+
+
+def _rate_fail():
+    _fails.setdefault(_client_ip(), []).append(_tm.time())
+
+
+def _access():
+    k = request.cookies.get("gk", "")
+    if not k:
+        return False, None
+    if ADMIN_KEY and _eq(k, ADMIN_KEY):
+        return True, {"id": "owner", "label": "Owner", "expires": None}
+    rec = _find_by_value(k)
+    if not rec or not _key_active(rec):
+        return False, None
+    d = request.cookies.get("gd", "")
+    if not d or d not in rec.get("devices", []):
+        return False, None
+    return True, rec
+
+
+def _current_key_id():
+    if not ADMIN_KEY:
+        return None
+    ok, rec = _access()
+    return rec["id"] if ok else None
+
+
+def _push_allowed(sub):
+    if not ADMIN_KEY:
+        return True
+    kid = sub.get("_k")
+    if not kid or kid == "owner":
+        return True
+    return _key_active(_find_by_id(kid))
+
+
+def _json(obj, status=200):
+    return Response(json.dumps(obj), status=status, mimetype="application/json")
+
+
+@app.before_request
+def _gate():
+    if not ADMIN_KEY:
+        return None
+    p = request.path
+    if p in _OPEN_PATHS or p.startswith("/admin") or p.endswith((".png", ".ico")):
+        return None
+    ok, _ = _access()
+    if ok:
+        return None
+    return _json({"error": "locked"}, 401)
+
+
+@app.route("/auth-status", methods=["GET"])
+def auth_status():
+    if not ADMIN_KEY:
+        return _json({"gated": False, "ok": True})
+    ok, rec = _access()
+    return _json({"gated": True, "ok": ok, "label": rec.get("label") if rec else None,
+                  "expires": rec.get("expires") if rec else None})
+
+
+@app.route("/auth", methods=["POST"])
+def auth():
+    if not ADMIN_KEY:
+        return _json({"ok": True})
+    if _rate_blocked():
+        return _json({"error": "Too many attempts. Try again in 10 minutes."}, 429)
+    data = request.get_json(silent=True) or {}
+    key = (data.get("key") or "").strip()
+    resp_ok = {"ok": True}
+    if _eq(key, ADMIN_KEY):
+        resp = _json(resp_ok)
+        resp.set_cookie("gk", key, max_age=34000000, httponly=True, secure=True, samesite="Lax")
+        return resp
+    rec = _find_by_value(key)
+    if not rec or not _key_active(rec):
+        _rate_fail()
+        return _json({"error": "Invalid or expired key"}, 401)
+    gd = request.cookies.get("gd", "") or _sec.token_hex(12)
+    devices = rec.get("devices", [])
+    if gd not in devices:
+        if len(devices) >= int(rec.get("max_devices", 2)):
+            return _json({"error": "Device limit reached for this key. Contact the seller."}, 403)
+
+        def add(lst):
+            for r in lst:
+                if r.get("id") == rec["id"]:
+                    r.setdefault("devices", [])
+                    if gd not in r["devices"]:
+                        r["devices"].append(gd)
+            return True
+        okw, _r = _keys_write(add)
+        if not okw:
+            return _json({"error": "Server busy, try again in a minute."}, 503)
+    resp = _json(resp_ok)
+    resp.set_cookie("gk", rec["key"], max_age=34000000, httponly=True, secure=True, samesite="Lax")
+    resp.set_cookie("gd", gd, max_age=34000000, httponly=True, secure=True, samesite="Lax")
+    return resp
+
+
+# ---------------- admin ----------------
+def _admin_token():
+    return _hm.new(ADMIN_KEY.encode(), b"admin-session", _hl.sha256).hexdigest()
+
+
+def _is_admin():
+    return bool(ADMIN_KEY) and _eq(request.cookies.get("ga", ""), _admin_token())
+
+
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+    if not ADMIN_KEY:
+        return _json({"error": "ADMIN_KEY is not set on the server"}, 503)
+    if _rate_blocked():
+        return _json({"error": "Too many attempts. Try again later."}, 429)
+    data = request.get_json(silent=True) or {}
+    if not _eq((data.get("key") or "").strip(), ADMIN_KEY):
+        _rate_fail()
+        return _json({"error": "Wrong admin key"}, 401)
+    resp = _json({"ok": True})
+    resp.set_cookie("ga", _admin_token(), max_age=2592000, httponly=True, secure=True, samesite="Strict")
+    return resp
+
+
+def _pub(r):
+    return {"id": r.get("id"), "label": r.get("label"), "key": r.get("key"), "created": r.get("created"),
+            "expires": r.get("expires"), "max_devices": r.get("max_devices", 2),
+            "devices": len(r.get("devices", [])), "revoked": bool(r.get("revoked")),
+            "active": _key_active(r)}
+
+
+@app.route("/admin/api/list", methods=["GET"])
+def admin_list():
+    if not _is_admin():
+        return _json({"error": "auth"}, 401)
+    _kc["ts"] = 0
+    return _json({"keys": [_pub(r) for r in _keys()], "today": _today()})
+
+
+@app.route("/admin/api/create", methods=["POST"])
+def admin_create():
+    if not _is_admin():
+        return _json({"error": "auth"}, 401)
+    d = request.get_json(silent=True) or {}
+    label = (str(d.get("label") or "Customer"))[:60]
+    try:
+        days = int(d.get("days") or 0)
+    except Exception:
+        days = 0
+    try:
+        maxd = max(1, min(10, int(d.get("max_devices") or 2)))
+    except Exception:
+        maxd = 2
+    alpha = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    key = "GS-" + "-".join("".join(_sec.choice(alpha) for _ in range(4)) for _ in range(3))
+    rec = {"id": _sec.token_hex(4), "label": label, "key": key, "created": _today(),
+           "expires": (datetime.now(timezone.utc) + _td(days=days)).strftime("%Y-%m-%d") if days > 0 else None,
+           "max_devices": maxd, "devices": [], "revoked": False}
+
+    def add(lst):
+        lst.append(rec)
+        return True
+    ok, _r = _keys_write(add)
+    if not ok:
+        return _json({"error": "Could not save to GitHub"}, 500)
+    return _json({"ok": True, "key": _pub(rec)})
+
+
+@app.route("/admin/api/update", methods=["POST"])
+def admin_update():
+    if not _is_admin():
+        return _json({"error": "auth"}, 401)
+    d = request.get_json(silent=True) or {}
+    kid, act = d.get("id"), d.get("action")
+    try:
+        days = int(d.get("days") or 30)
+    except Exception:
+        days = 30
+
+    def mut(lst):
+        for i, r in enumerate(lst):
+            if r.get("id") != kid:
+                continue
+            if act == "revoke":
+                r["revoked"] = True
+            elif act == "restore":
+                r["revoked"] = False
+            elif act == "reset":
+                r["devices"] = []
+            elif act == "devices":
+                r["max_devices"] = max(1, min(10, days))
+            elif act == "extend":
+                base = max(r.get("expires") or _today(), _today())
+                r["expires"] = (datetime.strptime(base, "%Y-%m-%d") + _td(days=days)).strftime("%Y-%m-%d")
+            elif act == "delete":
+                lst.pop(i)
+            else:
+                return False
+            return True
+        return False
+    ok, found = _keys_write(mut)
+    if not ok or not found:
+        return _json({"error": "Update failed"}, 500)
+    return _json({"ok": True})
+
+
+@app.route("/admin", methods=["GET"])
+def admin_page():
+    return Response(ADMIN_HTML, mimetype="text/html")
+
+
+ADMIN_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Access Admin</title><style>
+:root{--bg:#0e0f12;--card:#181a20;--b:#2a2d36;--t:#f2f3f5;--m:#9aa0ab;--a:#f5b301;--g:#2bb673;--r:#e5484d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:15px/1.4 system-ui,sans-serif;padding:16px;max-width:640px;margin:auto}
+h1{font-size:20px;margin:6px 0 14px}.card{background:var(--card);border:1px solid var(--b);border-radius:12px;padding:14px;margin-bottom:12px}
+input{width:100%;background:#0e0f12;color:var(--t);border:1px solid var(--b);border-radius:8px;padding:10px;font-size:15px;margin:4px 0 8px}
+.row{display:flex;gap:8px}.row>*{flex:1}label{font-size:12px;color:var(--m)}
+button{background:var(--a);color:#111;border:0;border-radius:8px;padding:9px 12px;font-weight:700;font-size:13px;cursor:pointer}
+button.s{background:#262932;color:var(--t);border:1px solid var(--b)}button.d{background:#3a1e20;color:#ff8a8f;border:1px solid #5a2a2d}
+.k{font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.5px;color:var(--a);cursor:pointer;word-break:break-all}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px}.on{background:#12351f;color:var(--g)}.off{background:#3a1e20;color:#ff8a8f}
+.m{color:var(--m);font-size:12px;margin:2px 0 8px}.btns{display:flex;flex-wrap:wrap;gap:6px}#msg{color:var(--m);font-size:13px;min-height:18px}
+</style></head><body><h1>Access keys</h1>
+<div id="login" class="card" style="display:none"><label>Admin key</label><input id="ak" type="password" autocomplete="off">
+<button onclick="login()">Sign in</button><div id="msg"></div></div>
+<div id="main" style="display:none">
+<div class="card"><b>New customer key</b><label>Customer name</label><input id="nl" placeholder="e.g. Rahul">
+<div class="row"><div><label>Valid for (days, 0 = no expiry)</label><input id="nd" type="number" value="30"></div>
+<div><label>Max devices</label><input id="nm" type="number" value="2"></div></div>
+<button onclick="create()">Create key</button><div id="msg2"></div></div>
+<div id="list"></div></div>
+<script>
+const $=id=>document.getElementById(id);
+async function api(p,b){const r=await fetch(p,b?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}:{});let j={};try{j=await r.json()}catch(e){}return{s:r.status,j}}
+async function login(){const r=await api("/admin/login",{key:$("ak").value});if(r.s==200){load()}else $("msg").textContent=r.j.error||"Failed"}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function invite(k){return "Gold Signals access\nApp: "+location.origin+"/\nYour key: "+k.key+(k.expires?"\nValid till: "+k.expires:"")+"\nEnter the key when the app asks. Works on up to "+k.max_devices+" devices."}
+async function load(){const r=await api("/admin/api/list");if(r.s!=200){$("login").style.display="block";$("main").style.display="none";return}
+$("login").style.display="none";$("main").style.display="block";window._k=r.j.keys;
+$("list").innerHTML=r.j.keys.length?r.j.keys.map((k,i)=>`<div class="card"><b>${esc(k.label)}</b> <span class="tag ${k.active?"on":"off"}">${k.revoked?"Revoked":k.active?"Active":"Expired"}</span>
+<div class="k" onclick="copy(${i},0)">${esc(k.key)}</div>
+<div class="m">Expires ${k.expires||"never"} · Devices ${k.devices}/${k.max_devices} · Created ${k.created}</div>
+<div class="btns"><button onclick="copy(${i},1)">Copy invite</button><button class="s" onclick="act('${k.id}','extend',30)">+30 days</button>
+${k.revoked?`<button class="s" onclick="act('${k.id}','restore')">Restore</button>`:`<button class="d" onclick="act('${k.id}','revoke')">Revoke</button>`}
+<button class="s" onclick="act('${k.id}','reset')">Reset devices</button><button class="d" onclick="del('${k.id}')">Delete</button></div></div>`).join(""):'<div class="m">No keys yet.</div>'}
+function copy(i,inv){const k=window._k[i];navigator.clipboard.writeText(inv?invite(k):k.key);$("msg2").textContent="Copied "+(inv?"invite message":"key")}
+async function act(id,a,d){const r=await api("/admin/api/update",{id,action:a,days:d});$("msg2").textContent=r.s==200?"Done":(r.j.error||"Failed");load()}
+async function del(id){if(confirm("Delete this key permanently?"))act(id,"delete")}
+async function create(){const r=await api("/admin/api/create",{label:$("nl").value,days:$("nd").value,max_devices:$("nm").value});
+if(r.s==200){$("nl").value="";$("msg2").textContent="Created "+r.j.key.key+" (tap it in the list to copy)"}else $("msg2").textContent=r.j.error||"Failed";load()}
+load();
+</script></body></html>"""
+
+
 
 
 @app.route("/latest", methods=["GET"])
