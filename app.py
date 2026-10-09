@@ -3043,7 +3043,7 @@ KEYS_PATH = "data/keys.json"
 _kc = {"ts": 0, "list": []}
 _fails = {}
 _OPEN_PATHS = {"/", "/ping", "/manifest.json", "/sw.js", "/vapid-public-key", "/scan-signals",
-               "/check-forex-news", "/webhook", "/auth", "/auth-status"}
+               "/check-forex-news", "/webhook", "/auth", "/auth-status", "/get", "/download"}
 
 
 def _eq(a, b):
@@ -3384,6 +3384,196 @@ load();
 </script></body></html>"""
 
 
+
+
+LANDING_HTML = r"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bullion Radar - Gold signals on your phone</title>
+<meta name="description" content="Bullion Radar scans XAUUSD for structure breaks on 15-minute and 1-minute charts and sends entry, stop-loss and targets to your phone.">
+<meta name="theme-color" content="#0A0E13">
+<link rel="icon" href="/icon192.png">
+<meta property="og:title" content="Bullion Radar">
+<meta property="og:description" content="Gold setups with entry, stop-loss and targets, pushed to your phone.">
+<meta property="og:image" content="/icon512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0A0E13;--panel:#101720;--line:#243040;--gold:#F5B301;--gold2:#FFD54A;--txt:#E8EDF2;--mut:#8D9AAA;--buy:#2DD4A0;--sell:#FF6B5E}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--ink);color:var(--txt);font:17px/1.6 Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+h1,h2,h3{font-family:"Bricolage Grotesque",Figtree,sans-serif;letter-spacing:-.02em;line-height:1.05}
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.brand{display:flex;align-items:center;gap:11px;font:700 19px "Bricolage Grotesque",sans-serif;text-decoration:none}
+.brand img{width:34px;height:34px;border-radius:9px}
+.nl{font-size:15px;color:var(--mut);text-decoration:none;padding:8px 0}
+.nl:hover{color:var(--txt)}
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center;padding:34px 0 70px}
+.hero h1{font-size:clamp(40px,6.2vw,76px);font-weight:800}
+.hero h1 em{font-style:normal;color:var(--gold)}
+.lead{margin:22px 0 30px;font-size:19px;color:#B9C4D0;max-width:33em}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--gold);color:#1A1200;font:700 16px Figtree,sans-serif;padding:15px 24px;border-radius:12px;text-decoration:none;border:2px solid var(--gold);transition:background .15s,transform .15s}
+.btn:hover{background:var(--gold2);transform:translateY(-1px)}
+.btn.ghost{background:transparent;color:var(--txt);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--gold);background:transparent}
+.btn:focus-visible,a:focus-visible{outline:3px solid var(--gold2);outline-offset:3px}
+.fine{margin-top:14px;font-size:14px;color:var(--mut)}
+.scope{position:relative;aspect-ratio:1;max-width:520px;width:100%;margin:0 auto}
+.scope canvas{width:100%;height:100%;display:block}
+.alert{position:absolute;left:-4%;bottom:2%;width:min(330px,82%);background:#1A222D;border:1px solid #2F3C4D;border-radius:18px;padding:12px 14px;box-shadow:0 18px 40px rgba(0,0,0,.5);display:flex;gap:12px;opacity:0;transform:translateY(16px);animation:pop .7s 1.6s cubic-bezier(.2,.8,.2,1) forwards}
+.alert img{width:42px;height:42px;border-radius:10px;flex:none}
+.alert b{font-size:15px;display:block;line-height:1.3}
+.alert span{font-size:13.5px;color:#B9C4D0;display:block;line-height:1.4;margin-top:2px}
+.alert small{position:absolute;right:12px;top:10px;font-size:11.5px;color:var(--mut)}
+@keyframes pop{to{opacity:1;transform:none}}
+section{padding:72px 0;border-top:1px solid var(--line)}
+section h2{font-size:clamp(30px,4.2vw,48px);font-weight:700;max-width:16em}
+.sub{color:var(--mut);margin-top:14px;max-width:38em}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0;margin-top:40px;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.cell{padding:28px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel)}
+.cell:nth-child(2n){border-right:0}.cell:nth-last-child(-n+2){border-bottom:0}
+.cell h3{font-size:23px;margin-bottom:8px}
+.cell p{color:#B0BCC9;font-size:16px}
+.setup{display:grid;grid-template-columns:1fr 1fr;gap:44px;margin-top:40px}
+.rule{display:grid;grid-template-columns:auto 1fr;gap:6px 20px;margin-top:26px}
+.rule dt{font:700 14px Figtree;padding:3px 10px;border-radius:7px;height:fit-content;white-space:nowrap}
+.rule dt.b{background:rgba(45,212,160,.14);color:var(--buy)}
+.rule dt.s{background:rgba(255,107,94,.14);color:var(--sell)}
+.rule dd{color:#B0BCC9;margin-bottom:12px;font-size:16px}
+.steps{list-style:none;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:0 0 26px 58px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:-2px;width:38px;height:38px;border-radius:50%;border:2px solid var(--gold);color:var(--gold);display:grid;place-items:center;font:800 17px "Bricolage Grotesque"}
+.steps li:not(:last-child)::after{content:"";position:absolute;left:18px;top:42px;bottom:4px;width:2px;background:var(--line)}
+.steps h3{font-size:21px;margin-bottom:4px}
+.steps p{color:#B0BCC9;font-size:16px}
+.ios{margin-top:6px;padding:18px 20px;border:1px dashed var(--line);border-radius:14px;color:#B0BCC9;font-size:15.5px}
+.final{text-align:left}
+.final h2{max-width:14em}
+footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--mut);font-size:13.5px;line-height:1.6}
+footer p{max-width:60em}
+.sweep-note{display:none}
+@media(max-width:860px){
+ .hero{grid-template-columns:1fr;padding-top:10px}
+ .scope{max-width:420px;margin-bottom:56px}
+ .alert{left:0}
+ .grid,.setup{grid-template-columns:1fr}
+ .cell{border-right:0!important;border-bottom:1px solid var(--line)!important}.cell:last-child{border-bottom:0!important}
+ section{padding:56px 0}
+}
+@media(prefers-reduced-motion:reduce){.alert{animation:none;opacity:1;transform:none}html{scroll-behavior:auto}}
+</style></head><body>
+<div class="wrap">
+<nav><a class="brand" href="/get"><img src="/icon192.png" alt="">Bullion Radar</a><a class="nl" href="#install">How to install</a></nav>
+
+<header class="hero">
+<div>
+<h1>Gold setups, <em>pinged to your phone</em> when the candle closes.</h1>
+<p class="lead">Bullion Radar watches XAUUSD on the 15-minute and 1-minute charts for structure breaks. When one forms, you get the entry, stop-loss and three targets as a push alert.</p>
+<div class="cta">
+<a class="btn" href="/download"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v12.2l4.6-4.6 1.4 1.4-7 7-7-7 1.4-1.4 4.6 4.6V3z"/></svg>Download for Android</a>
+{{CONTACT_BTN}}
+</div>
+<p class="fine">Access needs a personal key. {{CONTACT_LINE}}</p>
+</div>
+<div class="scope" aria-hidden="true">
+<canvas id="cv" width="1040" height="1040"></canvas>
+<div class="alert"><img src="/icon192.png" alt=""><div><b>BUY XAUUSD</b><span>Entry 2650.00 | SL 2642.00<br>TP1 2662.00 | TP2 2670.00</span></div><small>Sample alert</small></div>
+</div>
+</header>
+</div>
+
+<section><div class="wrap">
+<h2>One app for the whole trade, from alert to outcome.</h2>
+<div class="grid">
+<div class="cell"><h3>Alerts that carry the plan</h3><p>Every push shows direction, entry, stop-loss and targets. It arrives even when the app is closed.</p></div>
+<div class="cell"><h3>Chart with the indicator</h3><p>See each setup drawn on the gold chart, with timeframes from 1 minute up, so you can judge it before you act.</p></div>
+<div class="cell"><h3>Results you can check</h3><p>The Results tab tracks what each past signal did after it fired: targets hit and stops taken. You see the record, not a promise.</p></div>
+<div class="cell"><h3>Gold toolkit</h3><p>Live gold price, key levels and market sessions in the same app, so you are not switching between screens.</p></div>
+</div>
+</div></section>
+
+<section><div class="wrap">
+<h2>What triggers a signal.</h2>
+<p class="sub">The scanner uses closed candles only. It does not alert on a candle that is still forming.</p>
+<dl class="rule">
+<dt class="b">Buy</dt><dd>Price closes above the last confirmed swing high on the 1-minute chart, following 15-minute structure.</dd>
+<dt class="s">Sell</dt><dd>Price closes below the last confirmed swing low, with the same 15-minute structure behind it.</dd>
+</dl>
+</div></section>
+
+<section id="install"><div class="wrap">
+<h2>Start in three steps.</h2>
+<div class="setup">
+<ol class="steps">
+<li><h3>Get your access key</h3><p>Your key looks like GS-XXXX-XXXX-XXXX and works on up to 2 of your devices.</p></li>
+<li><h3>Install the app</h3><p>Tap Download for Android, open the file and allow installs from this source if Android asks.</p></li>
+<li><h3>Enter the key, allow notifications</h3><p>Paste your key when the app asks. Say yes to notifications so alerts reach you.</p></li>
+</ol>
+<div>
+<div class="ios"><b>On iPhone?</b> Open this site in Safari, tap Share, then Add to Home Screen. Enter the same key.</div>
+<div class="cta" style="margin-top:22px"><a class="btn" href="/download">Download for Android</a></div>
+</div>
+</div>
+</div></section>
+
+<footer><div class="wrap"><p><b>Bullion Radar</b> is a signal and charting tool. It is not financial advice and does not manage your money. Trading gold and forex carries a high risk of loss. Signals are not guaranteed to be profitable and past results do not predict future results. Trade only with money you can afford to lose and use your own judgement.</p></div></footer>
+
+<script>
+(function(){
+var c=document.getElementById("cv"),x=c.getContext("2d"),S=1040,R=S/2-30,cx=S/2,cy=S/2;
+var rm=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+var blips=[[.62,-.9,"B"],[.4,.5,"S"],[.78,2.3,"B"],[.28,-2.4,"B"],[.9,3.9,"S"]].map(function(b){return{r:b[0],a:b[1],t:b[2],lit:0}});
+function ring(r,al,w){x.beginPath();x.arc(cx,cy,r,0,7);x.strokeStyle="rgba(245,179,1,"+al+")";x.lineWidth=w;x.stroke()}
+function frame(t){
+ x.clearRect(0,0,S,S);
+ x.fillStyle="#0E151D";x.beginPath();x.arc(cx,cy,R+22,0,7);x.fill();
+ for(var i=1;i<=4;i++)ring(R*i/4,i==4?.9:.38,i==4?4:2);
+ x.strokeStyle="rgba(245,179,1,.22)";x.lineWidth=2;
+ for(var d=0;d<360;d+=30){var a=d*Math.PI/180,l=d%90==0?R:R*.92;x.beginPath();x.moveTo(cx+Math.cos(a)*(R-(d%90==0?0:34)),cy+Math.sin(a)*(R-(d%90==0?0:34)));x.lineTo(cx+Math.cos(a)*(R+(d%90==0?0:0)),cy+Math.sin(a)*(R+(d%90==0?0:0)));if(d%90==0){x.moveTo(cx,cy);x.lineTo(cx+Math.cos(a)*R,cy+Math.sin(a)*R)}x.stroke()}
+ var sw=rm?-0.6:(t/2600)%(Math.PI*2);
+ var g=x.createConicGradient?x.createConicGradient(sw-1.1,cx,cy):null;
+ if(g){g.addColorStop(0,"rgba(245,179,1,0)");g.addColorStop(.17,"rgba(245,179,1,.34)");g.addColorStop(.175,"rgba(245,179,1,0)");g.addColorStop(1,"rgba(245,179,1,0)");x.fillStyle=g;x.beginPath();x.arc(cx,cy,R,0,7);x.fill()}
+ x.strokeStyle="#FFD54A";x.lineWidth=5;x.lineCap="round";x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+Math.cos(sw)*R,cy+Math.sin(sw)*R);x.stroke();
+ blips.forEach(function(b){
+  var ba=((b.a%(Math.PI*2))+Math.PI*2)%(Math.PI*2),df=((sw-ba)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+  if(rm){b.lit=1}else if(df<.12)b.lit=1;else b.lit=Math.max(0,b.lit-.006);
+  if(b.lit>0){var px=cx+Math.cos(b.a)*R*b.r,py=cy+Math.sin(b.a)*R*b.r,col=b.t=="B"?"45,212,160":"255,107,94";
+   x.fillStyle="rgba("+col+","+(.22*b.lit)+")";x.beginPath();x.arc(px,py,30+14*(1-b.lit),0,7);x.fill();
+   x.fillStyle="rgba("+col+","+b.lit+")";x.beginPath();x.arc(px,py,10,0,7);x.fill();
+   x.fillStyle="rgba(232,237,242,"+b.lit+")";x.font="700 26px Figtree,sans-serif";x.fillText(b.t=="B"?"BUY":"SELL",px+22,py+9)}
+ });
+ x.fillStyle="#F5B301";x.beginPath();x.arc(cx,cy,10,0,7);x.fill();
+ if(!rm)requestAnimationFrame(frame)
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
+"""
+
+APK_URL = "https://github.com/cryptopump1988/gold-webhook-server/releases/latest/download/Bullion-Radar.apk"
+
+
+@app.route("/get", methods=["GET"])
+def landing_page():
+    contact = os.environ.get("CONTACT_URL", "").strip().replace('"', "")
+    if contact:
+        btn = '<a class="btn ghost" href="' + contact + '" rel="noopener">Get your access key</a>'
+        line = "Message us to get yours."
+    else:
+        btn = ""
+        line = "Ask whoever sent you this page."
+    html = LANDING_HTML.replace("{{CONTACT_BTN}}", btn).replace("{{CONTACT_LINE}}", line)
+    return Response(html, mimetype="text/html")
+
+
+@app.route("/download", methods=["GET"])
+def download_apk():
+    return Response("", status=302, headers={"Location": APK_URL})
 
 
 _lat_cache = {"ts": 0, "d": None}
