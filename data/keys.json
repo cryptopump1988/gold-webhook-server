@@ -1,15 +1,5 @@
 [
   {
-    "id": "8645d28d",
-    "label": "KEYSTORE_PASSWORD",
-    "key": "GS-NNPW-DRL8-S99Q",
-    "created": "2026-10-09",
-    "expires": "2026-11-08",
-    "max_devices": 1,
-    "devices": [],
-    "revoked": false
-  },
-  {
     "id": "98759f41",
     "label": "KEYSTORE_PASSWORD",
     "key": "GS-ETJZ-CLC9-BCYZ",
