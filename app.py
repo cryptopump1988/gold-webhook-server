@@ -3043,7 +3043,7 @@ KEYS_PATH = "data/keys.json"
 _kc = {"ts": 0, "list": []}
 _fails = {}
 _OPEN_PATHS = {"/", "/ping", "/manifest.json", "/sw.js", "/vapid-public-key", "/scan-signals",
-               "/check-forex-news", "/webhook", "/auth", "/auth-status", "/get", "/download"}
+               "/check-forex-news", "/webhook", "/auth", "/auth-status", "/get", "/download", "/.well-known/assetlinks.json"}
 
 
 def _eq(a, b):
@@ -3556,6 +3556,14 @@ requestAnimationFrame(frame);
 """
 
 APK_URL = "https://github.com/cryptopump1988/gold-webhook-server/releases/latest/download/Bullion-Radar.apk"
+
+
+ASSETLINKS_JSON = '[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"com.bakalestrading.gold","sha256_cert_fingerprints":["0B:6D:26:20:11:B0:59:59:EA:C6:0E:80:8C:DF:83:B0:38:10:32:96:51:FE:DA:6E:4A:B1:F0:91:35:D4:2F:55"]}}]'
+
+
+@app.route("/.well-known/assetlinks.json", methods=["GET"])
+def assetlinks():
+    return Response(ASSETLINKS_JSON, mimetype="application/json")
 
 
 @app.route("/get", methods=["GET"])
