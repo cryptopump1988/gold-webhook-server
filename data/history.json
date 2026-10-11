@@ -2,6 +2,19 @@
   {
     "symbol": "XAUUSD",
     "signal": "BUY",
+    "kind": "touch",
+    "entry": "4196.92",
+    "sl": "4194.04",
+    "tp1": "4199.79",
+    "tp2": "4202.67",
+    "tp3": "4205.55",
+    "chart_url": "/chart-image?signal=BUY&entry=4196.92&sl=4194.04&tp1=4199.79&tp2=4202.67&tp3=4205.55",
+    "time": "11 Oct 2026, 23:34 UTC",
+    "time_unix": 1791761640
+  },
+  {
+    "symbol": "XAUUSD",
+    "signal": "BUY",
     "kind": "signal",
     "entry": "4196.92",
     "sl": "4194.04",
