@@ -9,6 +9,19 @@
     "tp2": "4187.71",
     "tp3": "4184.57",
     "chart_url": "/chart-image?signal=SELL&entry=4193.98&sl=4197.11&tp1=4190.84&tp2=4187.71&tp3=4184.57",
+    "time": "12 Oct 2026, 00:08 UTC",
+    "time_unix": 1791763680
+  },
+  {
+    "symbol": "XAUUSD",
+    "signal": "SELL",
+    "kind": "touch",
+    "entry": "4193.98",
+    "sl": "4197.11",
+    "tp1": "4190.84",
+    "tp2": "4187.71",
+    "tp3": "4184.57",
+    "chart_url": "/chart-image?signal=SELL&entry=4193.98&sl=4197.11&tp1=4190.84&tp2=4187.71&tp3=4184.57",
     "time": "11 Oct 2026, 23:58 UTC",
     "time_unix": 1791763080
   },
