@@ -9,6 +9,19 @@
     "tp2": "4179.36",
     "tp3": "4186.84",
     "chart_url": "/chart-image?signal=BUY&entry=4164.39&sl=4156.90&tp1=4171.87&tp2=4179.36&tp3=4186.84",
+    "time": "14 Oct 2026, 03:41 UTC",
+    "time_unix": 1791949260
+  },
+  {
+    "symbol": "XAUUSD",
+    "signal": "BUY",
+    "kind": "touch",
+    "entry": "4164.39",
+    "sl": "4156.90",
+    "tp1": "4171.87",
+    "tp2": "4179.36",
+    "tp3": "4186.84",
+    "chart_url": "/chart-image?signal=BUY&entry=4164.39&sl=4156.90&tp1=4171.87&tp2=4179.36&tp3=4186.84",
     "time": "14 Oct 2026, 03:32 UTC",
     "time_unix": 1791948720
   },
@@ -1285,18 +1298,5 @@
     "chart_url": "",
     "time": "24 Aug 2026, 11:01 UTC",
     "time_unix": 1787569260
-  },
-  {
-    "symbol": "XAUUSD",
-    "signal": "SELL",
-    "kind": "signal",
-    "entry": "4597.91",
-    "sl": "4625.93",
-    "tp1": "4569.90",
-    "tp2": "4541.88",
-    "tp3": "4513.86",
-    "chart_url": "",
-    "time": "24 Aug 2026, 10:28 UTC",
-    "time_unix": 1787567280
   }
 ]
