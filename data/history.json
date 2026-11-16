@@ -9,6 +9,19 @@
     "tp2": "3845.83",
     "tp3": "3833.49",
     "chart_url": "/chart-image?signal=SELL&entry=3870.51&sl=3882.84&tp1=3858.17&tp2=3845.83&tp3=3833.49",
+    "time": "16 Nov 2026, 02:02 UTC",
+    "time_unix": 1794794520
+  },
+  {
+    "symbol": "XAUUSD",
+    "signal": "SELL",
+    "kind": "touch",
+    "entry": "3870.51",
+    "sl": "3882.84",
+    "tp1": "3858.17",
+    "tp2": "3845.83",
+    "tp3": "3833.49",
+    "chart_url": "/chart-image?signal=SELL&entry=3870.51&sl=3882.84&tp1=3858.17&tp2=3845.83&tp3=3833.49",
     "time": "16 Nov 2026, 01:39 UTC",
     "time_unix": 1794793140
   },
@@ -1285,18 +1298,5 @@
     "chart_url": "/chart-image?signal=SELL&entry=4113.94&sl=4132.21&tp1=4095.67&tp2=4077.40&tp3=4059.13",
     "time": "09 Nov 2026, 12:23 UTC",
     "time_unix": 1794226980
-  },
-  {
-    "symbol": "XAUUSD",
-    "signal": "SELL",
-    "kind": "touch",
-    "entry": "4113.94",
-    "sl": "4132.21",
-    "tp1": "4095.67",
-    "tp2": "4077.40",
-    "tp3": "4059.13",
-    "chart_url": "/chart-image?signal=SELL&entry=4113.94&sl=4132.21&tp1=4095.67&tp2=4077.40&tp3=4059.13",
-    "time": "09 Nov 2026, 06:33 UTC",
-    "time_unix": 1794205980
   }
 ]
